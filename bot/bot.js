@@ -3,16 +3,14 @@ const TelegramBot = require('node-telegram-bot-api');
 const { createClient } = require('@supabase/supabase-js');
 const cron = require('node-cron');
 const https = require('https');
-const fs = require('fs');
 
-const BOT_TOKEN = '8909448740:AAGhgI32iLGTls5eccYzPsj0ZeIREt_vgsc';
-const SUPABASE_URL = 'https://vofpisizzubbhpidgvoz.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvZnBpc2l6enViYmhwaWRndm96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MDg1OTksImV4cCI6MjA5NTM4NDU5OX0.Xa398Tqsq67ByUseDcN6ICw3WKxDpKvwF4tz5__FBlU';
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
-// Mapa completo de grupos
 const GROUP_MAP = {
   '-1003981585031': { session: '09:00', family: 'Familia 1' },
   '-1003762092274': { session: '09:00', family: 'Familia 2' },
@@ -60,7 +58,6 @@ const GROUP_MAP = {
 
 const HORARIOS = ['09:00', '10:15', '11:45', '13:30', '14:45', '16:00'];
 
-// Busca ou cria sessão do dia
 async function getOrCreateSession(timeStr) {
   const today = new Date();
   const dateStr = today.toISOString().split('T')[0];
@@ -90,7 +87,6 @@ async function getOrCreateSession(timeStr) {
   return data;
 }
 
-// Busca ou cria grupo na sessão
 async function getOrCreateGroup(sessionId, familyName, telegramGroupId) {
   const { data: existing } = await supabase
     .from('groups')
@@ -115,7 +111,6 @@ async function getOrCreateGroup(sessionId, familyName, telegramGroupId) {
   return data;
 }
 
-// Download da foto do Telegram
 function downloadFile(url) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -127,7 +122,6 @@ function downloadFile(url) {
   });
 }
 
-// Upload da foto para o Supabase
 async function uploadPhoto(sessionId, groupId, fileBuffer, fileName) {
   const path = `${sessionId}/${groupId}/${Date.now()}_${fileName}`;
 
@@ -155,7 +149,6 @@ async function uploadPhoto(sessionId, groupId, fileBuffer, fileName) {
   console.log(`✅ Foto salva: ${path}`);
 }
 
-// Processa foto recebida
 bot.on('photo', async (msg) => {
   const chatId = String(msg.chat.id);
   const groupInfo = GROUP_MAP[chatId];
@@ -171,7 +164,6 @@ bot.on('photo', async (msg) => {
     const session = await getOrCreateSession(groupInfo.session);
     const group = await getOrCreateGroup(session.id, groupInfo.family, chatId);
 
-    // Pega a maior resolução da foto
     const photo = msg.photo[msg.photo.length - 1];
     const file = await bot.getFile(photo.file_id);
     const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
@@ -186,7 +178,6 @@ bot.on('photo', async (msg) => {
   }
 });
 
-// Cria sessões automaticamente às 08:30
 cron.schedule('30 8 * * *', async () => {
   console.log('🌅 Criando sessões do dia...');
   for (const horario of HORARIOS) {
@@ -199,16 +190,13 @@ cron.schedule('30 8 * * *', async () => {
   }
 }, { timezone: 'America/Fortaleza' });
 
-// Limpa tudo às 23:00
 cron.schedule('0 23 * * *', async () => {
   console.log('🧹 Limpando fotos do dia...');
   try {
-    // Busca todas as fotos do dia
     const { data: photos } = await supabase
       .from('photos')
       .select('storage_path');
 
-    // Remove do storage
     if (photos && photos.length > 0) {
       const paths = photos.map(p => p.storage_path).filter(Boolean);
       if (paths.length > 0) {
@@ -216,7 +204,6 @@ cron.schedule('0 23 * * *', async () => {
       }
     }
 
-    // Limpa tabelas
     await supabase.from('photos').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await supabase.from('groups').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await supabase.from('sessions').update({ active: false }).eq('active', true);
