@@ -44,7 +44,7 @@ export const sessionsService = {
       .from('groups')
       .select('*, photos(id, url)')
       .eq('session_id', sessionId)
-      .order('created_at', { ascending: true });
+      .order('name', { ascending: true });
     if (error) throw error;
     return data;
   },

@@ -4,42 +4,35 @@ import {
   TextInput, ActivityIndicator, StatusBar, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { supabase } from '../services/supabase';
 import { colors, spacing, radius } from '../utils/theme';
 
+const ADMIN_PASSWORD = 'janga2026'; // troca pela senha que quiser
+
 export default function AdminLoginScreen({ navigation }) {
-  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
-    if (!phone || phone.length < 10) {
-      setError('Digite um número de celular válido.');
+    if (!password.trim()) {
+      setError('Digite a senha.');
       return;
     }
     setLoading(true);
     setError('');
-    try {
-      // Normaliza o número — remove tudo que não é dígito
-      const normalized = phone.replace(/\D/g, '');
 
-      const { data, error: dbError } = await supabase
-        .from('authorized_phones')
-        .select('*')
-        .eq('phone', normalized)
-        .single();
+    // Pequeno delay para não parecer instantâneo demais
+    await new Promise(resolve => setTimeout(resolve, 600));
 
-      if (dbError || !data) {
-        setError('Número não autorizado. Fale com o administrador.');
-        return;
-      }
-
-      navigation.replace('AdminDashboard');
-    } catch (e) {
-      setError('Erro ao verificar. Tente novamente.');
-    } finally {
+    if (password.trim() !== ADMIN_PASSWORD) {
+      setError('Senha incorreta.');
       setLoading(false);
+      return;
     }
+
+    navigation.replace('AdminDashboard');
+    setLoading(false);
   };
 
   return (
@@ -67,20 +60,24 @@ export default function AdminLoginScreen({ navigation }) {
 
         <View style={styles.form}>
           <View style={styles.inputWrap}>
-            <Text style={styles.label}>NÚMERO DE CELULAR</Text>
-            <View style={styles.phoneRow}>
-              <View style={styles.ddiBox}>
-                <Text style={styles.ddiText}>+55</Text>
-              </View>
+            <Text style={styles.label}>SENHA</Text>
+            <View style={styles.passwordRow}>
               <TextInput
                 style={styles.input}
-                value={phone}
-                onChangeText={(t) => { setPhone(t); setError(''); }}
-                keyboardType="phone-pad"
-                placeholder="84 99999-8888"
+                value={password}
+                onChangeText={(t) => { setPassword(t); setError(''); }}
+                placeholder="Digite a senha"
                 placeholderTextColor={colors.gray400}
-                maxLength={15}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
               />
+              <TouchableOpacity
+                style={styles.eyeBtn}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁️'}</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -130,22 +127,22 @@ const styles = StyleSheet.create({
   form: { width: '100%', maxWidth: 400, gap: spacing.lg },
   inputWrap: { gap: spacing.xs },
   label: { fontSize: 11, fontWeight: '700', letterSpacing: 2, color: colors.gray400 },
-  phoneRow: { flexDirection: 'row', gap: spacing.sm },
-  ddiBox: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1, borderColor: 'rgba(0,180,216,0.3)',
-    borderRadius: radius.md, padding: spacing.md,
-    alignItems: 'center', justifyContent: 'center',
-    minWidth: 64,
-  },
-  ddiText: { fontSize: 16, color: colors.white, fontWeight: '700' },
+  passwordRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   input: {
     flex: 1,
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1, borderColor: 'rgba(0,180,216,0.3)',
     borderRadius: radius.md, padding: spacing.md,
-    fontSize: 20, color: colors.white, letterSpacing: 2,
+    fontSize: 20, color: colors.white, letterSpacing: 4,
   },
+  eyeBtn: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1, borderColor: 'rgba(0,180,216,0.3)',
+    borderRadius: radius.md, padding: spacing.md,
+    alignItems: 'center', justifyContent: 'center',
+    width: 52, height: 52,
+  },
+  eyeText: { fontSize: 20 },
   error: { color: colors.error, textAlign: 'center', fontSize: 14 },
   loginBtn: { borderRadius: radius.full, overflow: 'hidden', marginTop: spacing.sm },
   loginGrad: { paddingVertical: spacing.lg, alignItems: 'center' },
