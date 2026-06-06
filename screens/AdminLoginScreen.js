@@ -6,7 +6,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, radius } from '../utils/theme';
 
-const ADMIN_PASSWORD = 'janga2026'; // troca pela senha que quiser
+import Constants from 'expo-constants';
+const ADMIN_PASSWORD = Constants.expoConfig?.extra?.adminPassword;
 
 export default function AdminLoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
