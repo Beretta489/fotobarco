@@ -10,6 +10,7 @@ import { colors, spacing, radius } from '../utils/theme';
 export default function PhoneScreen({ route, navigation }) {
   const { session, group, photoIds, photos, total, packageType } = route.params;
   const [phone, setPhone] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('pix');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -44,8 +45,7 @@ export default function PhoneScreen({ route, navigation }) {
         packageType,
         normalized,
       );
-      const pixData = ordersService.generatePixPayload(order.id, total);
-      navigation.navigate('Payment', { order, total, pixData, photos });
+      navigation.navigate('Payment', { order, total, photos, paymentMethod });
     } catch (e) {
       setError('Erro ao criar pedido. Tente novamente.');
     } finally {
@@ -112,6 +112,31 @@ export default function PhoneScreen({ route, navigation }) {
           ].map((item) => (
             <Text key={item} style={styles.infoItem}>{item}</Text>
           ))}
+        </View>
+
+        {/* Método de pagamento */}
+        <View style={styles.payCard}>
+          <Text style={styles.payLabel}>FORMA DE PAGAMENTO</Text>
+          <View style={styles.payRow}>
+            <TouchableOpacity
+              style={[styles.payBtn, paymentMethod === 'pix' && styles.payBtnActive]}
+              onPress={() => setPaymentMethod('pix')}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.payText, paymentMethod === 'pix' && styles.payTextActive]}>
+                ⚡ Pix
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.payBtn, paymentMethod === 'credit' && styles.payBtnActive]}
+              onPress={() => setPaymentMethod('credit')}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.payText, paymentMethod === 'credit' && styles.payTextActive]}>
+                💳 Crédito
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Botão */}
@@ -189,6 +214,25 @@ const styles = StyleSheet.create({
   error: { color: colors.error, fontSize: 14, textAlign: 'center' },
   infoWrap: { gap: spacing.sm, alignSelf: 'flex-start' },
   infoItem: { fontSize: 14, color: colors.accentLight },
+  payCard: {
+    width: '100%', backgroundColor: colors.cardBg,
+    borderWidth: 1, borderColor: 'rgba(255,214,10,0.3)',
+    borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm,
+  },
+  payLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 2, color: colors.gray400 },
+  payRow: {
+    flexDirection: 'row', gap: spacing.sm,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: radius.full, padding: 4,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  payBtn: {
+    flex: 1, paddingVertical: spacing.sm, alignItems: 'center',
+    borderRadius: radius.full,
+  },
+  payBtnActive: { backgroundColor: colors.gold },
+  payText: { fontSize: 15, fontWeight: '700', color: colors.accentLight, letterSpacing: 1 },
+  payTextActive: { color: colors.primary },
   continueBtn: { width: '100%', borderRadius: radius.full, overflow: 'hidden' },
   continueGrad: { paddingVertical: spacing.lg + 2, alignItems: 'center' },
   continueText: { fontSize: 20, fontWeight: '900', letterSpacing: 2, color: colors.primary },

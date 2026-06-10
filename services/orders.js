@@ -37,7 +37,7 @@ export const ordersService = {
   },
 
   async confirmPayment(orderId) {
-    const downloadToken = Math.random().toString(36).substring(2, 18).toUpperCase();
+    const downloadToken = crypto.randomUUID().replace(/-/g, '').toUpperCase();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
 
