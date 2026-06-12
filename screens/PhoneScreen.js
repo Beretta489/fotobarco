@@ -20,18 +20,24 @@ export default function PhoneScreen({ route, navigation }) {
   useEffect(() => {
     Animated.timing(fadeIn, { toValue: 1, duration: 700, useNativeDriver: true }).start();
 
-    Animated.loop(
+    const bounceLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(dolphinBounce, { toValue: -8, duration: 1200, useNativeDriver: true }),
         Animated.timing(dolphinBounce, { toValue: 0, duration: 1200, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    bounceLoop.start();
+    return () => bounceLoop.stop();
   }, []);
+
+  const VALID_DDD = ['11','12','13','14','15','16','17','18','19','21','22','24','27','28','31','32','33','34','35','36','37','38','41','42','43','44','45','46','47','48','49','51','53','54','55','61','62','63','64','65','66','67','68','69','71','73','74','75','77','79','81','82','83','84','85','86','87','88','89','91','92','93','94','95','96','97','98','99'];
 
   const handleContinue = async () => {
     const normalized = phone.replace(/\D/g, '');
-    if (normalized.length < 10) {
-      setError('Digite um número de celular válido.');
+    const ddd = normalized.substring(0, 2);
+    const num = normalized.substring(2);
+    if (!VALID_DDD.includes(ddd) || (num.length !== 8 && num.length !== 9)) {
+      setError('Número inválido. Use DDD + número (ex: 84 99999-8888).');
       return;
     }
     setLoading(true);

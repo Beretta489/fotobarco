@@ -33,13 +33,20 @@ export const photosService = {
   },
 
   async upload(sessionId, groupId, uri, fileName) {
-    const response = await fetch(uri);
-    const blob = await response.blob();
+    const ext = fileName.split('.').pop().toLowerCase();
+    const contentType =
+      ext === 'png' ? 'image/png' :
+      ext === 'heic' || ext === 'heif' ? 'image/heic' :
+      'image/jpeg';
+
     const path = `${sessionId}/${groupId}/${Date.now()}_${fileName}`;
+
+    const response = await fetch(uri);
+    const arrayBuffer = await response.arrayBuffer();
 
     const { error: uploadError } = await supabase.storage
       .from('photos')
-      .upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+      .upload(path, arrayBuffer, { contentType, upsert: false });
     if (uploadError) throw uploadError;
 
     const { data: { publicUrl } } = supabase.storage

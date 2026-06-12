@@ -22,7 +22,7 @@ export default function PackageSelectScreen({ route, navigation }) {
       price: 100.00,
       tag: 'MAIS POPULAR',
       tagColor: colors.gold,
-      savings: `economia de R$ ${(totalPhotos * 15 - 100).toFixed(2)}`,
+      savings: (totalPhotos * 15 - 100) > 0 ? `economia de R$ ${(totalPhotos * 15 - 100).toFixed(2)}` : null,
     },
     {
       id: 'half',

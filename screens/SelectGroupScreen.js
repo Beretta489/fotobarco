@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Image, ActivityIndicator, StatusBar, Dimensions, Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -37,12 +37,14 @@ export default function SelectGroupScreen({ navigation }) {
   const dolphinBounce = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(dolphinBounce, { toValue: -10, duration: 1200, useNativeDriver: true }),
         Animated.timing(dolphinBounce, { toValue: 0, duration: 1200, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    loop.start();
+    return () => loop.stop();
   }, []);
 
   const handleSelectSession = async (session) => {
@@ -50,11 +52,15 @@ export default function SelectGroupScreen({ navigation }) {
     setLoading(true);
     setError('');
     try {
+      const today = new Date().toISOString().split('T')[0];
+
       const { data: sessions, error: dbError } = await supabase
         .from('sessions')
         .select('*, groups(*)')
         .eq('active', true)
-        .ilike('name', `%${session.time}%`);
+        .eq('name', `Passeio ${session.time}`)
+        .gte('scheduled_at', `${today}T00:00:00.000Z`)
+        .lte('scheduled_at', `${today}T23:59:59.999Z`);
 
       if (dbError || !sessions || sessions.length === 0) {
         setError('Nenhuma sessão ativa para este horário. Fale com o atendente.');
@@ -162,7 +168,10 @@ export default function SelectGroupScreen({ navigation }) {
             <Text style={styles.groupInstruction}>
               👆 Toque no grupo onde você aparece nas fotos
             </Text>
-            <View style={styles.scrollContent}>
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+            >
               {rows.map((row, rowIndex) => (
                 <View key={rowIndex} style={styles.row}>
                   {row.map((group) => (
@@ -197,7 +206,7 @@ export default function SelectGroupScreen({ navigation }) {
                   ))}
                 </View>
               ))}
-            </View>
+            </ScrollView>
           </View>
         )}
       </LinearGradient>
@@ -206,8 +215,8 @@ export default function SelectGroupScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { width: '100%', height: '100vh', overflow: 'hidden' },
-  gradient: { flex: 1, height: '100%', flexDirection: 'column' },
+  container: { flex: 1 },
+  gradient: { flex: 1, flexDirection: 'column' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
@@ -251,14 +260,14 @@ const styles = StyleSheet.create({
   },
   sessionTime: { fontSize: 38, fontWeight: '900', color: colors.white },
   sessionHoras: { fontSize: 14, color: colors.accentLight },
-  groupsOuter: { flex: 1, overflow: 'hidden', flexDirection: 'column' },
+  groupsOuter: { flex: 1, flexDirection: 'column' },
   groupInstruction: {
     fontSize: 15, color: colors.gold, fontWeight: '700',
     textAlign: 'center', paddingVertical: spacing.md, flexShrink: 0,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,214,10,0.15)',
     backgroundColor: 'rgba(255,214,10,0.05)',
   },
-  scrollContent: { flex: 1, overflowY: 'auto', padding: spacing.lg },
+  scrollContent: { padding: spacing.lg },
   row: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   groupCard: {
     width: CARD_SIZE, height: CARD_SIZE * 1.15,

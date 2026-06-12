@@ -17,12 +17,14 @@ export default function WelcomeScreen({ navigation }) {
       Animated.timing(slideUp, { toValue: 0, duration: 1000, useNativeDriver: true }),
     ]).start();
 
-    Animated.loop(
+    const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1.05, duration: 1600, useNativeDriver: true }),
         Animated.timing(pulse, { toValue: 1, duration: 1600, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    pulseLoop.start();
+    return () => pulseLoop.stop();
   }, []);
 
   return (

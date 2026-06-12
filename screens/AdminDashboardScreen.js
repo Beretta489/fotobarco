@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ScrollView, ActivityIndicator, StatusBar, TextInput, Alert,
@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { sessionsService } from '../services/sessions';
 import { photosService } from '../services/photos';
 import { ordersService } from '../services/orders';
+import { authService } from '../services/auth';
 import { colors, spacing, radius } from '../utils/theme';
 
 const HORARIOS = [
@@ -21,13 +22,13 @@ export default function AdminDashboardScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
-  // Nova sessão
-  const [newSessionTime, setNewSessionTime] = useState('');
-
-  // Nova grupo
-  const [selectedSession, setSelectedSession] = useState(null);
-  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupNames, setNewGroupNames] = useState({});
   const [expandedSession, setExpandedSession] = useState(null);
+
+  const mounted = useRef(true);
+  useEffect(() => {
+    return () => { mounted.current = false; };
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -36,17 +37,31 @@ export default function AdminDashboardScreen({ navigation }) {
   const loadData = async () => {
     setLoading(true);
     try {
+      const session = await authService.getSession();
+      if (!session) {
+        navigation.replace('AdminLogin');
+        return;
+      }
       const [dash, sess] = await Promise.all([
         ordersService.getDashboard(),
         sessionsService.getAll(),
       ]);
+      if (!mounted.current) return;
       setDashboard(dash);
       setSessions(sess);
     } catch (e) {
+      if (!mounted.current) return;
       Alert.alert('Erro', 'Falha ao carregar dados.');
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authService.signOut();
+    } catch (_) {}
+    navigation.replace('Welcome');
   };
 
   const handleCreateSession = async (time) => {
@@ -56,7 +71,6 @@ export default function AdminDashboardScreen({ navigation }) {
 
     try {
       await sessionsService.create(`Passeio ${time}`, today.toISOString());
-      setNewSessionTime('');
       loadData();
       Alert.alert('✅ Sucesso', `Sessão ${time} criada!`);
     } catch (e) {
@@ -65,10 +79,11 @@ export default function AdminDashboardScreen({ navigation }) {
   };
 
   const handleCreateGroup = async (sessionId) => {
-    if (!newGroupName.trim()) return;
+    const name = (newGroupNames[sessionId] || '').trim();
+    if (!name) return;
     try {
-      await sessionsService.createGroup(sessionId, newGroupName.trim());
-      setNewGroupName('');
+      await sessionsService.createGroup(sessionId, name);
+      setNewGroupNames(prev => ({ ...prev, [sessionId]: '' }));
       loadData();
     } catch (e) {
       Alert.alert('Erro', 'Falha ao criar grupo.');
@@ -82,23 +97,29 @@ export default function AdminDashboardScreen({ navigation }) {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsMultipleSelection: true,
       quality: 0.8,
     });
     if (result.canceled) return;
     setUploading(true);
     try {
-      for (const asset of result.assets) {
-        const fileName = asset.uri.split('/').pop();
-        await photosService.upload(session.id, group.id, asset.uri, fileName);
+      const results = await Promise.allSettled(
+        result.assets.map(asset => {
+          const fileName = asset.uri.split('/').pop();
+          return photosService.upload(session.id, group.id, asset.uri, fileName);
+        })
+      );
+      const failed = results.filter(r => r.status === 'rejected').length;
+      const succeeded = results.filter(r => r.status === 'fulfilled').length;
+      if (failed > 0) {
+        Alert.alert('Upload parcial', `${succeeded} enviada(s), ${failed} falharam.`);
+      } else {
+        Alert.alert('✅ Sucesso', `${succeeded} foto(s) enviada(s)!`);
       }
-      Alert.alert('✅ Sucesso', `${result.assets.length} foto(s) enviada(s)!`);
       loadData();
-    } catch (e) {
-      Alert.alert('Erro', 'Falha no upload das fotos.');
     } finally {
-      setUploading(false);
+      if (mounted.current) setUploading(false);
     }
   };
 
@@ -128,21 +149,16 @@ export default function AdminDashboardScreen({ navigation }) {
       <StatusBar hidden />
       <View style={styles.sun} />
 
-      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>🐬 Admin — Jangalancha Show</Text>
           <Text style={styles.headerSub}>Painel de controle</Text>
         </View>
-        <TouchableOpacity
-          onPress={() => navigation.replace('Welcome')}
-          style={styles.logoutBtn}
-        >
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
           <Text style={styles.logoutText}>Sair</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Tabs */}
       <View style={styles.tabs}>
         {[
           { key: 'dashboard', label: '📊 Dashboard' },
@@ -163,7 +179,6 @@ export default function AdminDashboardScreen({ navigation }) {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* DASHBOARD */}
         {tab === 'dashboard' && dashboard && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Hoje</Text>
@@ -204,7 +219,6 @@ export default function AdminDashboardScreen({ navigation }) {
           </View>
         )}
 
-        {/* SESSÕES ATIVAS */}
         {tab === 'sessions' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Sessões ativas</Text>
@@ -228,7 +242,6 @@ export default function AdminDashboardScreen({ navigation }) {
                     </TouchableOpacity>
                   </View>
 
-                  {/* Grupos da sessão */}
                   <TouchableOpacity
                     style={styles.expandBtn}
                     onPress={() => setExpandedSession(
@@ -269,12 +282,13 @@ export default function AdminDashboardScreen({ navigation }) {
                         </View>
                       ))}
 
-                      {/* Adicionar grupo */}
                       <View style={styles.addGroupWrap}>
                         <TextInput
                           style={styles.groupInput}
-                          value={newGroupName}
-                          onChangeText={setNewGroupName}
+                          value={newGroupNames[session.id] || ''}
+                          onChangeText={(v) =>
+                            setNewGroupNames(prev => ({ ...prev, [session.id]: v }))
+                          }
                           placeholder="Nome do grupo (ex: Família Silva)"
                           placeholderTextColor={colors.gray400}
                         />
@@ -298,7 +312,6 @@ export default function AdminDashboardScreen({ navigation }) {
           </View>
         )}
 
-        {/* NOVA SESSÃO */}
         {tab === 'create' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Criar sessão de hoje</Text>

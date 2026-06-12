@@ -4,10 +4,11 @@ import {
   TextInput, ActivityIndicator, StatusBar, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Constants from 'expo-constants';
+import { authService } from '../services/auth';
 import { colors, spacing, radius } from '../utils/theme';
 
-import Constants from 'expo-constants';
-const ADMIN_PASSWORD = Constants.expoConfig?.extra?.adminPassword;
+const ADMIN_EMAIL = Constants.expoConfig?.extra?.adminEmail ?? 'admin@fotobarco.app';
 
 export default function AdminLoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
@@ -22,18 +23,14 @@ export default function AdminLoginScreen({ navigation }) {
     }
     setLoading(true);
     setError('');
-
-    // Pequeno delay para não parecer instantâneo demais
-    await new Promise(resolve => setTimeout(resolve, 600));
-
-    if (password.trim() !== ADMIN_PASSWORD) {
+    try {
+      await authService.signIn(ADMIN_EMAIL, password.trim());
+      navigation.replace('AdminDashboard');
+    } catch (e) {
       setError('Senha incorreta.');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    navigation.replace('AdminDashboard');
-    setLoading(false);
   };
 
   return (

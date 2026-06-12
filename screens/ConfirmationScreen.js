@@ -18,12 +18,14 @@ export default function ConfirmationScreen({ route, navigation }) {
       Animated.timing(fadeAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
     ]).start();
 
-    Animated.loop(
+    const bounceLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(dolphinBounce, { toValue: -12, duration: 600, useNativeDriver: true }),
         Animated.timing(dolphinBounce, { toValue: 0, duration: 600, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    bounceLoop.start();
+    return () => bounceLoop.stop();
   }, []);
 
   const downloadLink = `https://jangadashow.com.br/fotos/${order.download_token}`;

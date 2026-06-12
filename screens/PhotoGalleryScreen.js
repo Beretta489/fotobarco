@@ -191,8 +191,8 @@ export default function PhotoGalleryScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { width: '100%', height: '100vh', overflow: 'hidden' },
-  gradient: { flex: 1, height: '100%' },
+  container: { flex: 1 },
+  gradient: { flex: 1 },
   sun: {
     position: 'absolute', top: -80, right: -80,
     width: 260, height: 260, borderRadius: 130,

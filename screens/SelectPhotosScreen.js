@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable,
   Image, StatusBar, Dimensions, Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -125,12 +125,13 @@ export default function SelectPhotosScreen({ route, navigation }) {
                     {isSingle && !isSelected && (
                       <Text style={styles.priceTag}>R$ {PRICE_PER_PHOTO.toFixed(2)}</Text>
                     )}
-                    <TouchableOpacity
+                    <Pressable
                       style={styles.zoomBtn}
                       onPress={() => setPreviewPhoto(item)}
+                      hitSlop={8}
                     >
                       <Text style={styles.zoomIcon}>🔍</Text>
-                    </TouchableOpacity>
+                    </Pressable>
                   </TouchableOpacity>
                 );
               })}
@@ -261,8 +262,8 @@ export default function SelectPhotosScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { width: '100%', height: '100vh', overflow: 'hidden' },
-  gradient: { flex: 1, height: '100%' },
+  container: { flex: 1 },
+  gradient: { flex: 1 },
   sun: {
     position: 'absolute', top: -80, right: -80,
     width: 260, height: 260, borderRadius: 130,

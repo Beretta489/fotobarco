@@ -1,6 +1,7 @@
 .env
 .env.local
 .env.*
+bot/.env
 node_modules/
 bot/node_modules/
 .expo/
@@ -11,3 +12,4 @@ web-build/
 *.key
 .DS_Store
 Thumbs.db
+bot/node

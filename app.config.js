@@ -26,15 +26,7 @@ export default {
     extra: {
       supabaseUrl: process.env.SUPABASE_URL,
       supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
-      adminPassword: process.env.ADMIN_PASSWORD,
-      efiClientId: process.env.EFI_CLIENT_ID,
-      efiClientSecret: process.env.EFI_CLIENT_SECRET,
-      efiPixKey: process.env.EFI_PIX_KEY,
-      efiSandbox: process.env.EFI_SANDBOX,
-      infinitiPayApiKey: process.env.INFINITIPAY_API_KEY,
-      zapiInstanceId: process.env.ZAPI_INSTANCE_ID,
-      zapiToken: process.env.ZAPI_TOKEN,
-      zapiClientToken: process.env.ZAPI_CLIENT_TOKEN,
+      adminEmail: process.env.ADMIN_EMAIL,
     }
   }
 };

@@ -6,9 +6,13 @@ const https = require('https');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+if (!BOT_TOKEN) { console.error('❌ BOT_TOKEN não definido'); process.exit(1); }
+if (!SUPABASE_URL) { console.error('❌ SUPABASE_URL não definida'); process.exit(1); }
+if (!SUPABASE_SERVICE_KEY) { console.error('❌ SUPABASE_SERVICE_ROLE_KEY não definida — o bot precisa da service role para operar'); process.exit(1); }
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 const GROUP_MAP = {
@@ -59,8 +63,7 @@ const GROUP_MAP = {
 const HORARIOS = ['09:00', '10:15', '11:45', '13:30', '14:45', '16:00'];
 
 async function getOrCreateSession(timeStr) {
-  const today = new Date();
-  const dateStr = today.toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0];
   const name = `Passeio ${timeStr}`;
 
   const { data: existing } = await supabase
@@ -68,8 +71,8 @@ async function getOrCreateSession(timeStr) {
     .select('*')
     .eq('name', name)
     .eq('active', true)
-    .gte('created_at', `${dateStr}T00:00:00`)
-    .single();
+    .gte('created_at', `${today}T00:00:00`)
+    .maybeSingle();
 
   if (existing) return existing;
 
@@ -83,7 +86,19 @@ async function getOrCreateSession(timeStr) {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    // Race condition: outro processo inseriu primeiro
+    const { data: retry } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('name', name)
+      .eq('active', true)
+      .gte('created_at', `${today}T00:00:00`)
+      .limit(1)
+      .maybeSingle();
+    if (retry) return retry;
+    throw error;
+  }
   return data;
 }
 
@@ -93,7 +108,7 @@ async function getOrCreateGroup(sessionId, familyName, telegramGroupId) {
     .select('*')
     .eq('session_id', sessionId)
     .eq('telegram_group_id', telegramGroupId)
-    .single();
+    .maybeSingle();
 
   if (existing) return existing;
 
@@ -107,18 +122,38 @@ async function getOrCreateGroup(sessionId, familyName, telegramGroupId) {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    // Race condition: outro processo inseriu primeiro
+    const { data: retry } = await supabase
+      .from('groups')
+      .select('*')
+      .eq('session_id', sessionId)
+      .eq('telegram_group_id', telegramGroupId)
+      .maybeSingle();
+    if (retry) return retry;
+    throw error;
+  }
   return data;
 }
 
 function downloadFile(url) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    https.get(url, (res) => {
+    const req = https.get(url, (res) => {
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        res.resume();
+        reject(new Error(`HTTP ${res.statusCode} ao baixar foto`));
+        return;
+      }
       res.on('data', (chunk) => chunks.push(chunk));
       res.on('end', () => resolve(Buffer.concat(chunks)));
       res.on('error', reject);
-    }).on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(30000, () => {
+      req.destroy();
+      reject(new Error('Timeout ao baixar foto'));
+    });
   });
 }
 
@@ -193,14 +228,26 @@ cron.schedule('30 8 * * *', async () => {
 cron.schedule('0 23 * * *', async () => {
   console.log('🧹 Limpando fotos do dia...');
   try {
-    const { data: photos } = await supabase
-      .from('photos')
-      .select('storage_path');
+    // Paginar para não limitar a 1000 registros
+    let allPaths = [];
+    let from = 0;
+    const PAGE_SIZE = 1000;
+    while (true) {
+      const { data, error } = await supabase
+        .from('photos')
+        .select('storage_path')
+        .range(from, from + PAGE_SIZE - 1);
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      allPaths = allPaths.concat(data.map(p => p.storage_path).filter(Boolean));
+      if (data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
+    }
 
-    if (photos && photos.length > 0) {
-      const paths = photos.map(p => p.storage_path).filter(Boolean);
-      if (paths.length > 0) {
-        await supabase.storage.from('photos').remove(paths);
+    if (allPaths.length > 0) {
+      // Remover em lotes de 100 (limite do storage API)
+      for (let i = 0; i < allPaths.length; i += 100) {
+        await supabase.storage.from('photos').remove(allPaths.slice(i, i + 100));
       }
     }
 
@@ -208,7 +255,7 @@ cron.schedule('0 23 * * *', async () => {
     await supabase.from('groups').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await supabase.from('sessions').update({ active: false }).eq('active', true);
 
-    console.log('✅ Limpeza concluída!');
+    console.log(`✅ Limpeza concluída! ${allPaths.length} arquivos removidos.`);
   } catch (e) {
     console.error('❌ Erro na limpeza:', e.message);
   }

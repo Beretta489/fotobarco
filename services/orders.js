@@ -28,16 +28,7 @@ export const ordersService = {
     return order;
   },
 
-  generatePixPayload(orderId, total) {
-    const txId = orderId.replace(/-/g, '').substring(0, 25).toUpperCase();
-    return {
-      copyPaste: `00020126580014br.gov.bcb.pix0136${txId}5204000053039865406${total.toFixed(2).replace('.', '')}5802BR5913JangalanchaShow6009SAO PAULO62070503***6304ABCD`,
-      txId,
-    };
-  },
-
-  async confirmPayment(orderId) {
-    const downloadToken = crypto.randomUUID().replace(/-/g, '').toUpperCase();
+  async confirmPayment(orderId, downloadToken) {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
 
