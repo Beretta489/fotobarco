@@ -7,8 +7,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, radius } from '../utils/theme';
 
 export default function CheckoutScreen({ route, navigation }) {
-  const { session, photoIds, photos, total, packageType, group } = route.params;
+  const { session, photoIds, photos, total, packageType, group, extras = [], extrasTotal = 0 } = route.params;
   const [loading, setLoading] = useState(false);
+
+  const grandTotal = total + extrasTotal;
 
   const packageLabel = {
     all: '📦 Pacote Completo',
@@ -22,8 +24,9 @@ export default function CheckoutScreen({ route, navigation }) {
       group,
       photoIds,
       photos,
-      total,
+      total: grandTotal,
       packageType,
+      extras,
     });
   };
 
@@ -74,10 +77,23 @@ export default function CheckoutScreen({ route, navigation }) {
             </Text>
             <Text style={styles.rowValue}>R$ {total.toFixed(2)}</Text>
           </View>
+
+          {extras.length > 0 && (
+            <>
+              <View style={styles.divider} />
+              {extras.map((extra) => (
+                <View key={extra.id} style={styles.row}>
+                  <Text style={styles.rowLabel}>{extra.quantity}× {extra.name}</Text>
+                  <Text style={styles.rowValue}>R$ {extra.subtotal.toFixed(2)}</Text>
+                </View>
+              ))}
+            </>
+          )}
+
           <View style={styles.divider} />
           <View style={styles.row}>
             <Text style={styles.totalLabel}>TOTAL</Text>
-            <Text style={styles.totalValue}>R$ {total.toFixed(2)}</Text>
+            <Text style={styles.totalValue}>R$ {grandTotal.toFixed(2)}</Text>
           </View>
         </View>
 
@@ -112,7 +128,7 @@ export default function CheckoutScreen({ route, navigation }) {
             ) : (
               <>
                 <Text style={styles.payIcon}>📱</Text>
-                <Text style={styles.payText}>CONTINUAR · R$ {total.toFixed(2)}</Text>
+                <Text style={styles.payText}>CONTINUAR · R$ {grandTotal.toFixed(2)}</Text>
               </>
             )}
           </LinearGradient>

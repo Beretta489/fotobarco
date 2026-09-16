@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
 export const ordersService = {
-  async create(sessionId, groupId, photoIds, total, packageType, clientPhone) {
+  async create(sessionId, groupId, photoIds, total, packageType, clientPhone, extras = []) {
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
@@ -24,6 +24,20 @@ export const ordersService = {
       .from('order_items')
       .insert(items);
     if (itemsError) throw itemsError;
+
+    if (extras && extras.length > 0) {
+      const extraRows = extras.map((extra) => ({
+        order_id: order.id,
+        name: extra.name,
+        unit_price: extra.unit_price,
+        quantity: extra.quantity,
+        subtotal: extra.subtotal,
+      }));
+      const { error: extrasError } = await supabase
+        .from('order_extras')
+        .insert(extraRows);
+      if (extrasError) throw extrasError;
+    }
 
     return order;
   },

@@ -8,7 +8,7 @@ import { ordersService } from '../services/orders';
 import { colors, spacing, radius } from '../utils/theme';
 
 export default function PhoneScreen({ route, navigation }) {
-  const { session, group, photoIds, photos, total, packageType } = route.params;
+  const { session, group, photoIds, photos, total, packageType, extras = [] } = route.params;
   const [phone, setPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('pix');
   const [loading, setLoading] = useState(false);
@@ -50,6 +50,7 @@ export default function PhoneScreen({ route, navigation }) {
         total,
         packageType,
         normalized,
+        extras,
       );
       navigation.navigate('Payment', { order, total, photos, paymentMethod });
     } catch (e) {

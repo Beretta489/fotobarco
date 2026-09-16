@@ -7,6 +7,7 @@ import SelectGroupScreen from '../screens/SelectGroupScreen';
 import PhotoGalleryScreen from '../screens/PhotoGalleryScreen';
 import PackageSelectScreen from '../screens/PackageSelectScreen';
 import SelectPhotosScreen from '../screens/SelectPhotosScreen';
+import ExtrasScreen from '../screens/ExtrasScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
 import PaymentScreen from '../screens/PaymentScreen';
 import ConfirmationScreen from '../screens/ConfirmationScreen';
@@ -25,6 +26,7 @@ export default function AppNavigator() {
         <Stack.Screen name="PhotoGallery" component={PhotoGalleryScreen} />
         <Stack.Screen name="PackageSelect" component={PackageSelectScreen} />
         <Stack.Screen name="SelectPhotos" component={SelectPhotosScreen} />
+        <Stack.Screen name="Extras" component={ExtrasScreen} />
         <Stack.Screen name="Checkout" component={CheckoutScreen} />
         <Stack.Screen name="Payment" component={PaymentScreen} />
         <Stack.Screen name="Confirmation" component={ConfirmationScreen} />

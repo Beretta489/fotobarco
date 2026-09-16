@@ -144,7 +144,7 @@ export default function SelectPhotosScreen({ route, navigation }) {
           {canCheckout ? (
             <TouchableOpacity
               style={styles.checkoutBtn}
-              onPress={() => navigation.navigate('Checkout', {
+              onPress={() => navigation.navigate('Extras', {
                 session,
                 group,
                 photoIds: [...selected],

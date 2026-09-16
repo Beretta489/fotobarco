@@ -50,7 +50,7 @@ export default function PackageSelectScreen({ route, navigation }) {
     setSelected(pkg.id);
     setTimeout(() => {
       if (pkg.id === 'all') {
-        navigation.navigate('Checkout', {
+        navigation.navigate('Extras', {
           session,
           group,
           photoIds: photos.map(p => p.id),
