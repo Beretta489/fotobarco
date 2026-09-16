@@ -4,7 +4,6 @@ import {
   StatusBar, Animated, TextInput, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ordersService } from '../services/orders';
 import { colors, spacing, radius } from '../utils/theme';
 
 export default function PhoneScreen({ route, navigation }) {
@@ -32,7 +31,13 @@ export default function PhoneScreen({ route, navigation }) {
 
   const VALID_DDD = ['11','12','13','14','15','16','17','18','19','21','22','24','27','28','31','32','33','34','35','36','37','38','41','42','43','44','45','46','47','48','49','51','53','54','55','61','62','63','64','65','66','67','68','69','71','73','74','75','77','79','81','82','83','84','85','86','87','88','89','91','92','93','94','95','96','97','98','99'];
 
-  const handleContinue = async () => {
+  // Esta tela NAO cria mais o pedido.
+  //
+  // Antes ela chamava ordersService.create() com o 'total' calculado no app --
+  // e a policy do banco aceitava qualquer valor. Agora o pedido nasce dentro da
+  // Edge Function payment-intent-create, que recalcula o preco pelo catalogo do
+  // servidor. Aqui so coletamos telefone e forma de pagamento.
+  const handleContinue = () => {
     const normalized = phone.replace(/\D/g, '');
     const ddd = normalized.substring(0, 2);
     const num = normalized.substring(2);
@@ -40,24 +45,22 @@ export default function PhoneScreen({ route, navigation }) {
       setError('Número inválido. Use DDD + número (ex: 84 99999-8888).');
       return;
     }
-    setLoading(true);
     setError('');
-    try {
-      const order = await ordersService.create(
-        session.id,
-        group?.id,
-        photoIds,
-        total,
-        packageType,
-        normalized,
-        extras,
-      );
-      navigation.navigate('Payment', { order, total, photos, paymentMethod });
-    } catch (e) {
-      setError('Erro ao criar pedido. Tente novamente.');
-    } finally {
-      setLoading(false);
-    }
+
+    navigation.navigate('Payment', {
+      // Dados do pedido -- a cobranca e aberta na tela seguinte.
+      session,
+      group,
+      photoIds,
+      photos,
+      packageType,
+      extras,
+      clientPhone: normalized,
+      paymentMethod,
+      // 'total' segue apenas para EXIBICAO enquanto o servidor nao responde.
+      // O valor cobrado de verdade vem de volta da Edge Function.
+      totalEstimado: total,
+    });
   };
 
   return (
@@ -125,25 +128,33 @@ export default function PhoneScreen({ route, navigation }) {
         <View style={styles.payCard}>
           <Text style={styles.payLabel}>FORMA DE PAGAMENTO</Text>
           <View style={styles.payRow}>
-            <TouchableOpacity
-              style={[styles.payBtn, paymentMethod === 'pix' && styles.payBtnActive]}
-              onPress={() => setPaymentMethod('pix')}
-              activeOpacity={0.85}
-            >
-              <Text style={[styles.payText, paymentMethod === 'pix' && styles.payTextActive]}>
-                ⚡ Pix
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.payBtn, paymentMethod === 'credit' && styles.payBtnActive]}
-              onPress={() => setPaymentMethod('credit')}
-              activeOpacity={0.85}
-            >
-              <Text style={[styles.payText, paymentMethod === 'credit' && styles.payTextActive]}>
-                💳 Crédito
-              </Text>
-            </TouchableOpacity>
+            {[
+              { id: 'pix',    rotulo: '⚡ Pix' },
+              { id: 'credit', rotulo: '💳 Crédito' },
+              { id: 'debit',  rotulo: '💳 Débito' },
+            ].map((opcao) => (
+              <TouchableOpacity
+                key={opcao.id}
+                style={[styles.payBtn, paymentMethod === opcao.id && styles.payBtnActive]}
+                onPress={() => setPaymentMethod(opcao.id)}
+                activeOpacity={0.85}
+              >
+                <Text
+                  style={[styles.payText, paymentMethod === opcao.id && styles.payTextActive]}
+                  numberOfLines={1}
+                >
+                  {opcao.rotulo}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
+
+          {/* Crédito e débito cobram no proprio tablet, por aproximacao. */}
+          <Text style={styles.payHint}>
+            {paymentMethod === 'pix'
+              ? 'QR Code na tela — o cliente paga pelo celular dele'
+              : 'Maquininha no tablet — o cliente aproxima o cartão'}
+          </Text>
         </View>
 
         {/* Botão */}
@@ -234,12 +245,15 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
   payBtn: {
-    flex: 1, paddingVertical: spacing.sm, alignItems: 'center',
-    borderRadius: radius.full,
+    flex: 1, paddingVertical: spacing.sm, paddingHorizontal: 2,
+    alignItems: 'center', borderRadius: radius.full,
   },
   payBtnActive: { backgroundColor: colors.gold },
-  payText: { fontSize: 15, fontWeight: '700', color: colors.accentLight, letterSpacing: 1 },
+  // Fonte e letterSpacing menores que antes: agora sao 3 opcoes na mesma linha,
+  // e "Crédito"/"Débito" precisam caber sem quebrar em tablet estreito.
+  payText: { fontSize: 13, fontWeight: '700', color: colors.accentLight, letterSpacing: 0.5 },
   payTextActive: { color: colors.primary },
+  payHint: { fontSize: 12, color: colors.gray400, textAlign: 'center', marginTop: 2 },
   continueBtn: { width: '100%', borderRadius: radius.full, overflow: 'hidden' },
   continueGrad: { paddingVertical: spacing.lg + 2, alignItems: 'center' },
   continueText: { fontSize: 20, fontWeight: '900', letterSpacing: 2, color: colors.primary },

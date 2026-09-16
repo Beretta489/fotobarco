@@ -13,3 +13,6 @@ web-build/
 .DS_Store
 Thumbs.db
 bot/node
+
+# lixo do Supabase CLI
+supabase/.temp/

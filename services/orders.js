@@ -1,66 +1,27 @@
 import { supabase } from './supabase';
 
+// =============================================================================
+// ATENCAO -- create() e confirmPayment() foram REMOVIDOS daqui de proposito.
+// =============================================================================
+// create(sessionId, groupId, photoIds, TOTAL, ...)
+//   Inseria o pedido direto do app com o total calculado na tela. Como o app
+//   roda com a anon key (publica) e a policy aceitava qualquer valor, dava para
+//   criar um pedido de R$ 0,01 e levar todas as fotos.
+//   -> Agora o pedido nasce na Edge Function payment-intent-create, que
+//      recalcula o preco pelo catalogo do servidor.
+//
+// confirmPayment(orderId, downloadToken)
+//   Marcava status='paid' a partir do app. Quem controla o aparelho liberaria
+//   fotos sem pagar. (Na pratica ja falhava: nao existe policy de UPDATE em
+//   orders para o anon -- o fluxo nunca funcionou de ponta a ponta.)
+//   -> Agora quem confirma e a Edge Function payment-confirm, depois de
+//      perguntar a InfinitePay se a transacao existe e o valor bate.
+//
+// Se precisar criar pedido ou confirmar pagamento, use services/infinitepay.js.
+// Nao traga estes metodos de volta.
+// =============================================================================
+
 export const ordersService = {
-  async create(sessionId, groupId, photoIds, total, packageType, clientPhone, extras = []) {
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        session_id: sessionId,
-        group_id: groupId,
-        total,
-        status: 'pending',
-        package_type: packageType,
-        client_phone: clientPhone,
-      })
-      .select()
-      .single();
-    if (orderError) throw orderError;
-
-    const items = photoIds.map((photoId) => ({
-      order_id: order.id,
-      photo_id: photoId,
-    }));
-    const { error: itemsError } = await supabase
-      .from('order_items')
-      .insert(items);
-    if (itemsError) throw itemsError;
-
-    if (extras && extras.length > 0) {
-      const extraRows = extras.map((extra) => ({
-        order_id: order.id,
-        name: extra.name,
-        unit_price: extra.unit_price,
-        quantity: extra.quantity,
-        subtotal: extra.subtotal,
-      }));
-      const { error: extrasError } = await supabase
-        .from('order_extras')
-        .insert(extraRows);
-      if (extrasError) throw extrasError;
-    }
-
-    return order;
-  },
-
-  async confirmPayment(orderId, downloadToken) {
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30);
-
-    const { data, error } = await supabase
-      .from('orders')
-      .update({
-        status: 'paid',
-        paid_at: new Date().toISOString(),
-        download_token: downloadToken,
-        download_expires_at: expiresAt.toISOString(),
-      })
-      .eq('id', orderId)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  },
-
   async getWithPhotos(orderId) {
     const { data, error } = await supabase
       .from('orders')
