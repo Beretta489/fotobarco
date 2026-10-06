@@ -138,15 +138,14 @@ export const infinitePayService = {
    * Quem confirma o Pix e o webhook da InfinitePay; esta chamada so le o
    * resultado. Devolve { status: 'pending' | 'paid' | 'expired' }.
    *
-   * `transactionNsu` e opcional e serve para recuperacao manual: quando o
-   * webhook nao chega, o operador digita o NSU do comprovante e o servidor
-   * confere direto no provedor.
+   * Esta funcao NAO confirma pagamento. Para o caso do webhook nao chegar, a
+   * liberacao manual e recuperarPix() -- que exige admin logado.
    */
-  async checkPixStatus(orderNsu, transactionNsu = null) {
+  async checkPixStatus(orderNsu) {
     try {
       return await callFunction(
         'payment-status',
-        { orderNsu, ...(transactionNsu ? { transactionNsu } : {}) },
+        { orderNsu },
         { timeoutMs: 10000 },
       );
     } catch (e) {
@@ -155,6 +154,22 @@ export const infinitePayService = {
       if (e.paymentStatus) return { ok: false, status: e.paymentStatus, error: e.code };
       throw e;
     }
+  },
+
+  /**
+   * Libera na mao um Pix que o webhook nao confirmou.
+   *
+   * Uso: o cliente mostra o comprovante no celular dele, o operador digita o
+   * NSU da transacao. O servidor pergunta a InfinitePay se aquela transacao
+   * existe e se o valor bate -- exatamente como no fluxo automatico. A unica
+   * coisa que muda e a janela de tempo aceita.
+   *
+   * SO FUNCIONA COM ADMIN LOGADO. A function recusa a anon key do tablet: como
+   * essa chave esta dentro do APK, aceita-la aqui daria a qualquer pessoa o
+   * poder de liberar um pedido vencido.
+   */
+  async recuperarPix({ orderNsu, transactionNsu }) {
+    return callFunction('payment-recover', { orderNsu, transactionNsu });
   },
 };
 
@@ -233,6 +248,12 @@ export function mensagemDeErro(code) {
       'Nao foi possivel gerar o Pix. Tente novamente ou use cartao.',
     PAGAMENTO_NAO_ENCONTRADO:
       'Pagamento nao encontrado. Refaca o pedido.',
+
+    // --- recuperacao manual do Pix (payment-recover) ---------------------
+    NAO_AUTORIZADO:
+      'Sessao de admin expirada. Entre de novo no painel para liberar.',
+    NSU_AUSENTE:
+      'Digite o NSU que aparece no comprovante do cliente.',
   };
   return mapa[code] || 'Nao foi possivel concluir o pagamento. Tente novamente.';
 }

@@ -16,17 +16,24 @@
 // │ sido pago. Por isso existe o modo de recuperacao abaixo.                   │
 // └────────────────────────────────────────────────────────────────────────────┘
 //
-// Entrada: { orderNsu, transactionNsu? }
-//   - sem transactionNsu -> so consulta o estado (uso normal do polling)
-//   - com transactionNsu -> tenta confirmar (recuperacao manual: o operador
-//     digita o NSU do comprovante quando o webhook falhou)
+// Entrada: { orderNsu }
+// Saida:   { ok, status, orderId, downloadToken?, downloadExpiresAt? }
 //
-// Saida: { ok, status, orderId, downloadToken?, downloadExpiresAt? }
+// ┌──────── ESTE ENDPOINT SO LE. NAO CONFIRMA PAGAMENTO. ─────────────────────┐
+// │ Ele ja aceitou um 'transactionNsu' para recuperacao manual, e isso era um │
+// │ furo: quem chama aqui e o tablet, com a ANON KEY -- que esta dentro do    │
+// │ APK e portanto e publica. Pior, aquele caminho rodava como source         │
+// │ 'polling', que e isento do teto de tentativas (de proposito, porque o     │
+// │ polling normal nao adivinha nada). Juntando as duas coisas, dava para     │
+// │ varrer transaction_nsu contra um order_nsu conhecido, sem limite.         │
+// │                                                                           │
+// │ A recuperacao manual agora vive em payment-recover, que exige admin       │
+// │ logado de verdade e conta as tentativas.                                  │
+// └───────────────────────────────────────────────────────────────────────────┘
 // =============================================================================
 
 import { corsHeaders, errorResponse, json } from "../_shared/config.ts";
 import { serviceClient } from "../_shared/db.ts";
-import { confirmIntent } from "../_shared/confirm.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -41,27 +48,9 @@ Deno.serve(async (req) => {
     const orderNsu = String(body.orderNsu ?? "").trim();
     if (!orderNsu) return errorResponse("ORDER_NSU_AUSENTE");
 
-    const transactionNsu = String(body.transactionNsu ?? "").trim();
-
-    // --- recuperacao manual: o operador tem o NSU do comprovante em maos ----
-    // Passa pelas mesmas validacoes de sempre, inclusive conferencia no
-    // provedor e anti-replay. Nao e um atalho para liberar fotos.
-    if (transactionNsu) {
-      const result = await confirmIntent(db, {
-        orderNsu,
-        transactionNsu,
-        source: "polling",
-      });
-
-      return json({
-        ok: result.status === "paid",
-        status: result.status,
-        error: result.code,
-        orderId: result.orderId,
-        downloadToken: result.downloadToken,
-        downloadExpiresAt: result.downloadExpiresAt,
-      }, result.httpStatus);
-    }
+    // Um 'transactionNsu' que chegue aqui e ignorado em silencio -- a porta de
+    // confirmacao manual e a payment-recover. Responder com erro so informaria
+    // a quem esta sondando que o campo um dia existiu.
 
     // ------------------------------- consulta simples (polling normal) ------
     const { data: intent, error } = await db

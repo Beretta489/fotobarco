@@ -2,6 +2,10 @@
 .env.local
 .env.*
 bot/.env
+
+# O exemplo entra no repositorio de proposito: so nomes de variavel, sem valor.
+!.env.example
+!bot/.env.example
 node_modules/
 bot/node_modules/
 .expo/

@@ -154,9 +154,19 @@ export default function AdminDashboardScreen({ navigation }) {
           <Text style={styles.headerTitle}>🐬 Admin — Jangalancha Show</Text>
           <Text style={styles.headerSub}>Painel de controle</Text>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
-          <Text style={styles.logoutText}>Sair</Text>
-        </TouchableOpacity>
+        <View style={styles.headerAcoes}>
+          {/* Fora das abas de proposito: isto nao e uma secao do painel, e o
+              socorro para quando um Pix pago nao foi confirmado sozinho. */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('PendingOrders')}
+            style={styles.pendentesBtn}
+          >
+            <Text style={styles.pendentesText}>💸 Pix pendentes</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+            <Text style={styles.logoutText}>Sair</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.tabs}>
@@ -379,6 +389,12 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 18, fontWeight: '900', color: colors.white },
   headerSub: { fontSize: 13, color: colors.gray400 },
+  headerAcoes: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  pendentesBtn: {
+    paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
+    borderRadius: radius.full, borderWidth: 1, borderColor: 'rgba(255,214,10,0.45)',
+  },
+  pendentesText: { color: colors.gold, fontSize: 14, fontWeight: '700' },
   logoutBtn: {
     paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
     borderRadius: radius.full, borderWidth: 1, borderColor: 'rgba(255,71,87,0.4)',

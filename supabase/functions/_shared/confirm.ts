@@ -32,8 +32,16 @@ export interface ConfirmInput {
   slug?: string | null;
   /** Campo 'warning' do deeplink: presente = transacao nao concluida. */
   warning?: string | null;
-  /** De onde veio a tentativa -- so para auditoria. */
-  source: "deeplink" | "webhook" | "polling";
+  /**
+   * De onde veio a tentativa. Vale para auditoria E para duas regras:
+   *
+   *   'polling'  -- isento do teto de tentativas (nao adivinha nada, so
+   *                 pergunta se ja caiu) e "ainda nao pago" nao e falha.
+   *   'recovery' -- operador logado liberando um Pix na mao. Unico caminho que
+   *                 aceita um intent ja expirado, dentro de recoveryWindowDays.
+   *                 Todas as outras validacoes continuam valendo.
+   */
+  source: "deeplink" | "webhook" | "polling" | "recovery";
   /** Dados opcionais do cartao, para o comprovante. */
   aut?: string | null;
   cardBrand?: string | null;
@@ -97,7 +105,17 @@ export async function confirmIntent(
     };
   }
 
-  if (["failed", "canceled", "expired"].includes(intent.status)) {
+  // 'expired' nao e estado terminal para a RECUPERACAO MANUAL: o Pix pode ter
+  // sido pago dentro do prazo e so o aviso do provedor ter se perdido. Nesse
+  // caso o dinheiro existe e as fotos precisam sair. Para todos os outros
+  // caminhos -- e para 'failed'/'canceled' em qualquer caminho -- a porta
+  // continua fechada: 'failed' significa que alguma validacao JA recusou esta
+  // cobranca, e reabrir isso anularia a recusa.
+  const estadosTerminais = source === "recovery"
+    ? ["failed", "canceled"]
+    : ["failed", "canceled", "expired"];
+
+  if (estadosTerminais.includes(intent.status)) {
     return {
       status: intent.status as "failed" | "expired",
       httpStatus: 409,
@@ -107,7 +125,25 @@ export async function confirmIntent(
   }
 
   // ---------------------------------------------- 3. validade e tentativas --
-  if (new Date(intent.expires_at).getTime() < Date.now()) {
+  if (source === "recovery") {
+    // A recuperacao usa uma janela propria, contada da CRIACAO do intent: a
+    // falha que ela conserta (webhook perdido) costuma ser notada bem depois
+    // dos 15 minutos do fluxo automatico, as vezes so no fechamento do caixa.
+    //
+    // Ainda assim a janela e finita. Sem limite, um order_nsu antigo ficaria
+    // para sempre aceitando um transaction_nsu -- e quanto mais velho o
+    // registro, menor a chance de alguem conferir se a liberacao fazia sentido.
+    const limite = new Date(intent.created_at).getTime()
+      + config.recoveryWindowDays * 86_400_000;
+
+    if (Date.now() > limite) {
+      await logEvent(db, {
+        type: "payment_failed", intentId: intent.id, orderId: intent.order_id,
+        payload: { reason: "fora_da_janela_de_recuperacao", source },
+      });
+      return { status: "expired", httpStatus: 409, code: "PAGAMENTO_EXPIRADO", orderId: intent.order_id };
+    }
+  } else if (new Date(intent.expires_at).getTime() < Date.now()) {
     await db.from("payment_intents")
       .update({ status: "expired", failure_reason: "expirado_antes_da_confirmacao" })
       .eq("id", intent.id)
@@ -171,7 +207,13 @@ export async function confirmIntent(
       type: "replay_blocked", intentId: intent.id, orderId: intent.order_id,
       payload: { transactionNsu, usadaEm: jaUsada.id, source },
     });
-    await failIntent(db, intent, "transacao_ja_utilizada_em_outro_pedido", source);
+    // Na recuperacao manual o intent NAO e queimado: o operador esta digitando
+    // um NSU lido de um comprovante, e errar o numero nao pode condenar um
+    // pedido que talvez esteja pago de verdade. Quem segura o abuso aqui e o
+    // teto de confirm_attempts, nao a morte do intent.
+    if (source !== "recovery") {
+      await failIntent(db, intent, "transacao_ja_utilizada_em_outro_pedido", source);
+    }
     return { status: "failed", httpStatus: 409, code: "TRANSACAO_JA_UTILIZADA", orderId: intent.order_id };
   }
 
@@ -207,7 +249,12 @@ export async function confirmIntent(
       if (source === "polling") {
         return { status: "pending", httpStatus: 200, code: "AGUARDANDO_PAGAMENTO", orderId: intent.order_id };
       }
-      await failIntent(db, intent, "provedor_nao_confirmou_pagamento", source);
+      // Mesma razao do passo 5: NSU digitado errado e erro de digitacao, nao
+      // veredito sobre o pedido. Deixa o intent de pe para uma segunda leitura
+      // do comprovante.
+      if (source !== "recovery") {
+        await failIntent(db, intent, "provedor_nao_confirmou_pagamento", source);
+      }
       return { status: "failed", httpStatus: 402, code: "PAGAMENTO_NAO_CONFIRMADO", orderId: intent.order_id };
     }
 
@@ -221,11 +268,13 @@ export async function confirmIntent(
         type: "amount_mismatch", intentId: intent.id, orderId: intent.order_id,
         payload: { esperado: intent.amount_cents, recebido: check.amountCents, source },
       });
-      await failIntent(
-        db, intent,
-        `valor_divergente: esperado ${intent.amount_cents}, recebido ${check.amountCents}`,
-        source,
-      );
+      if (source !== "recovery") {
+        await failIntent(
+          db, intent,
+          `valor_divergente: esperado ${intent.amount_cents}, recebido ${check.amountCents}`,
+          source,
+        );
+      }
       return { status: "failed", httpStatus: 409, code: "VALOR_DIVERGENTE", orderId: intent.order_id };
     }
   } else {
@@ -238,9 +287,15 @@ export async function confirmIntent(
   const downloadToken = generateDownloadToken();
   const downloadExpiresAt = new Date(Date.now() + DOWNLOAD_TTL_DAYS * 86_400_000);
 
-  // O update e condicionado a status='pending'. Se o webhook e o polling
+  // O update e condicionado ao status anterior. Se o webhook e o polling
   // chegarem juntos, so um encontra o registro pendente -- o outro cai na
   // idempotencia do passo 2. E a trava contra dupla liberacao.
+  //
+  // Na recuperacao manual 'expired' tambem entra, porque e exatamente o estado
+  // do intent que o passo 3 deixou passar. 'paid' nunca entra em nenhum dos
+  // dois casos: um pedido ja liberado nao e liberado de novo.
+  const statusLiberaveis = source === "recovery" ? ["pending", "expired"] : ["pending"];
+
   const { data: updatedIntent, error: updateError } = await db
     .from("payment_intents")
     .update({
@@ -252,7 +307,7 @@ export async function confirmIntent(
       confirmed_at: new Date().toISOString(),
     })
     .eq("id", intent.id)
-    .eq("status", "pending")
+    .in("status", statusLiberaveis)
     .select()
     .maybeSingle();
 

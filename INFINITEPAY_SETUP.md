@@ -29,6 +29,17 @@ supabase secrets set APP_DEEPLINK_SCHEME=fotobarco           # igual ao app.conf
 | **CNPJ/CPF** | Documento da conta InfinitePay. Sem ponto, barra ou traço. |
 | **Scheme** | Você escolhe. Já está como `fotobarco` no `app.config.js`. |
 
+**Dois opcionais**, que valem a pena cadastrar:
+
+```bash
+supabase secrets set ADMIN_EMAIL=admin@exemplo.com.br   # quem libera Pix na mão
+supabase secrets set PAYMENT_RECOVERY_WINDOW_DAYS=7     # janela da recuperação
+```
+
+Sem `ADMIN_EMAIL`, qualquer usuário autenticado do projeto consegue liberar um
+Pix manualmente. Hoje só existe a conta do admin, então na prática dá no mesmo —
+mas cadastrar fecha a porta caso um dia existam outros logins.
+
 `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` são injetados pela plataforma —
 não cadastre, e **não** ponha no `.env` do repo (esse arquivo alimenta o app, e
 tudo que chega no app é público).
@@ -51,12 +62,17 @@ supabase db push
 supabase functions deploy payment-intent-create
 supabase functions deploy payment-confirm
 supabase functions deploy payment-status
+supabase functions deploy payment-recover
 supabase functions deploy payment-webhook --no-verify-jwt
 ```
 
 > 🚨 **O `--no-verify-jwt` é só para o webhook.** A InfinitePay não manda JWT,
-> então esse endpoint precisa ser público. Nas outras três a flag seria uma
+> então esse endpoint precisa ser público. Nas outras quatro a flag seria uma
 > falha grave — elas só devem aceitar chamadas do app autenticado.
+
+> A `payment-recover` vai além do `verify_jwt`: ela chama `auth.getUser()` no
+> token recebido e recusa quem não for um usuário de verdade. Motivo: a anon key
+> **é** um JWT válido, e ela está dentro do APK.
 
 ---
 
@@ -140,9 +156,23 @@ O `payment-status` apenas lê o que o webhook gravou.
 
 **Se o webhook não chegar, o Pix fica pendente mesmo tendo sido pago.**
 
-Saída manual já implementada: o operador informa o NSU do comprovante e o
-`payment-status` confere direto no provedor — passando pelas mesmas validações,
-não é atalho. Falta só a tela para digitar isso (ver seção 7).
+Saída manual, completa: **Painel → Pix pendentes**. O operador lê o NSU no
+comprovante do celular do cliente e a `payment-recover` confere direto no
+provedor — mesmas validações do fluxo normal, não é atalho.
+
+Três detalhes que fazem essa tela funcionar na prática:
+
+- **Ela aceita intent vencido.** O fluxo automático morre em 15 minutos, e o
+  problema que ela resolve costuma ser percebido depois disso — às vezes só no
+  fechamento do caixa. A janela dela é `PAYMENT_RECOVERY_WINDOW_DAYS` (7 dias),
+  contada da criação do pedido.
+- **NSU errado não queima o pedido.** Nos outros caminhos uma recusa do
+  provedor marca o intent como `failed`. Aqui não: o operador está digitando um
+  número lido de uma tela, e um erro de digitação não pode condenar um pedido
+  que talvez esteja pago. Quem segura abuso é o teto de tentativas.
+- **Ela exige login.** `payment-status` aceita a anon key porque quem chama é o
+  tablet no meio da venda. Dar a essa chave o poder de ignorar a expiração seria
+  entregá-lo a qualquer pessoa que baixe o APK.
 
 ---
 
@@ -163,8 +193,8 @@ Inverter isso derruba a criação de pedidos em produção.
 
 ## 7. O que ficou de fora
 
-- [ ] **Tela de pedidos pendentes** — para o caso do webhook não chegar. O backend
-      já aceita (`payment-status` com `transactionNsu`); falta a interface.
+- [x] ~~**Tela de pedidos pendentes**~~ — feita: `screens/PendingOrdersScreen.js`
+      + `supabase/functions/payment-recover`. Ver seção 5.
 - [ ] **Entrega por WhatsApp** — o `zapiService` foi removido junto com o
       `payments.js` (tinha token no cliente). Se quiser de volta, precisa virar
       Edge Function.

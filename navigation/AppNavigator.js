@@ -13,6 +13,7 @@ import PaymentScreen from '../screens/PaymentScreen';
 import ConfirmationScreen from '../screens/ConfirmationScreen';
 import AdminLoginScreen from '../screens/AdminLoginScreen';
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
+import PendingOrdersScreen from '../screens/PendingOrdersScreen';
 import PhoneScreen from '../screens/PhoneScreen';
 
 const Stack = createStackNavigator();
@@ -32,6 +33,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Confirmation" component={ConfirmationScreen} />
         <Stack.Screen name="AdminLogin" component={AdminLoginScreen} />
         <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+        <Stack.Screen name="PendingOrders" component={PendingOrdersScreen} />
         <Stack.Screen name="Phone" component={PhoneScreen} />
       </Stack.Navigator>
     </NavigationContainer>

@@ -85,6 +85,13 @@ export const config = {
     // Scheme do deeplink de retorno. Precisa bater EXATAMENTE com o "scheme"
     // declarado em app.config.js, senao o InfinitePay nao consegue voltar.
     deeplinkScheme: optional("APP_DEEPLINK_SCHEME", "fotobarco"),
+
+    // OPCIONAL. Se cadastrado, somente esta conta consegue liberar um pagamento
+    // na mao pela payment-recover. Sem ele, qualquer usuario autenticado do
+    // projeto passa -- hoje so existe a conta do admin, mas cadastrar fecha a
+    // porta caso um dia existam outros logins.
+    //   supabase secrets set ADMIN_EMAIL=admin@jangalanchashow.com.br
+    adminEmail: optional("ADMIN_EMAIL", ""),
   },
 
   // Validade do intent. Passou disso, o cliente refaz o pagamento.
@@ -94,6 +101,16 @@ export const config = {
   // Teto de tentativas de confirmacao por intent. Barra forca bruta em cima do
   // endpoint de confirmacao (tentar varios nsu ate acertar um valido).
   maxConfirmAttempts: Number(optional("PAYMENT_MAX_CONFIRM_ATTEMPTS", "10")),
+
+  // Janela da RECUPERACAO MANUAL do Pix (payment-recover), contada a partir da
+  // criacao do intent. O fluxo automatico morre em intentTtlMinutes; esta
+  // janela e mais longa de proposito, porque a falha que ela resolve (webhook
+  // que nao chegou) so e percebida depois -- as vezes no fechamento do caixa.
+  //
+  // Nao e um furo: a liberacao continua exigindo que a InfinitePay confirme a
+  // transacao e o valor. O que a janela limita e por quanto tempo vale a pena
+  // deixar essa porta aberta.
+  recoveryWindowDays: Number(optional("PAYMENT_RECOVERY_WINDOW_DAYS", "7")),
 };
 
 // =============================================================================
