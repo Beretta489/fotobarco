@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 2, color: colors.gray400 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
   card: {
-    minHeight: 168,
+    minHeight: 190,
     backgroundColor: colors.cardBg,
     borderWidth: 1, borderColor: colors.cardBorder,
     borderRadius: radius.lg,
@@ -199,8 +199,8 @@ const styles = StyleSheet.create({
   cardActive: { borderColor: colors.gold, borderWidth: 2, backgroundColor: 'rgba(255,214,10,0.10)' },
   cardBody: { gap: spacing.xs },
   cardEmoji: { fontSize: 40 },
-  cardName: { fontSize: 15, fontWeight: '700', color: colors.white, lineHeight: 19 },
-  cardPrice: { fontSize: 16, fontWeight: '900', color: colors.gold },
+  cardName: { fontSize: 20, fontWeight: '700', color: colors.white, lineHeight: 25 },
+  cardPrice: { fontSize: 22, fontWeight: '900', color: colors.gold },
   actionRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: spacing.sm },
   addBtn: {
     width: 44, height: 44, borderRadius: 22,
