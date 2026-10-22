@@ -52,15 +52,21 @@ export default function SelectGroupScreen({ navigation }) {
     setLoading(true);
     setError('');
     try {
-      const today = new Date().toISOString().split('T')[0];
+      // "Hoje" no fuso do aparelho, nao em UTC. O bot grava scheduled_at em
+      // hora local; usando o dia UTC, depois das 21h (Fortaleza, UTC-3) o app
+      // ja procurava as sessoes do dia seguinte e nao achava nenhuma.
+      const inicioDoDia = new Date();
+      inicioDoDia.setHours(0, 0, 0, 0);
+      const fimDoDia = new Date(inicioDoDia);
+      fimDoDia.setDate(fimDoDia.getDate() + 1);
 
       const { data: sessions, error: dbError } = await supabase
         .from('sessions')
         .select('*, groups(*)')
         .eq('active', true)
         .eq('name', `Passeio ${session.time}`)
-        .gte('scheduled_at', `${today}T00:00:00.000Z`)
-        .lte('scheduled_at', `${today}T23:59:59.999Z`);
+        .gte('scheduled_at', inicioDoDia.toISOString())
+        .lt('scheduled_at', fimDoDia.toISOString());
 
       if (dbError || !sessions || sessions.length === 0) {
         setError('Nenhuma sessão ativa para este horário. Fale com o atendente.');

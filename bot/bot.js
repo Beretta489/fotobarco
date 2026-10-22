@@ -63,7 +63,11 @@ const GROUP_MAP = {
 const HORARIOS = ['09:00', '10:15', '11:45', '13:30', '14:45', '16:00'];
 
 async function getOrCreateSession(timeStr) {
-  const today = new Date().toISOString().split('T')[0];
+  // Inicio do dia no fuso LOCAL. Com o dia em UTC, depois das 21h (UTC-3) o
+  // bot achava que ja era amanha e criava uma sessao duplicada.
+  const inicioDoDia = new Date();
+  inicioDoDia.setHours(0, 0, 0, 0);
+  const today = inicioDoDia.toISOString();
   const name = `Passeio ${timeStr}`;
 
   const { data: existing } = await supabase
@@ -71,7 +75,7 @@ async function getOrCreateSession(timeStr) {
     .select('*')
     .eq('name', name)
     .eq('active', true)
-    .gte('created_at', `${today}T00:00:00`)
+    .gte('created_at', today)
     .maybeSingle();
 
   if (existing) return existing;
@@ -93,7 +97,7 @@ async function getOrCreateSession(timeStr) {
       .select('*')
       .eq('name', name)
       .eq('active', true)
-      .gte('created_at', `${today}T00:00:00`)
+      .gte('created_at', today)
       .limit(1)
       .maybeSingle();
     if (retry) return retry;
