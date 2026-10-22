@@ -9,6 +9,23 @@ import { EXTRAS_CATALOG, buildExtras } from '../utils/extras';
 
 const H_PADDING = spacing.lg;
 const GAP = spacing.md;
+const CONTENT_BASE = 264;
+
+/**
+ * "+" ou "−" desenhado com barras, e nao com texto. O glifo de texto fica
+ * acima ou abaixo do centro conforme a fonte, e dentro de um circulo isso
+ * aparece como desalinhado; as barras ficam no centro exato.
+ */
+function Sinal({ mais, tamanho, cor }) {
+  const espessura = Math.max(3, Math.round(tamanho / 6));
+  const barra = { position: 'absolute', backgroundColor: cor, borderRadius: espessura / 2 };
+  return (
+    <View style={{ width: tamanho, height: tamanho, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={[barra, { width: tamanho, height: espessura }]} />
+      {mais && <View style={[barra, { width: espessura, height: tamanho }]} />}
+    </View>
+  );
+}
 
 export default function ExtrasScreen({ route, navigation }) {
   const { session, group, photoIds, photos, total, packageType } = route.params;
@@ -19,6 +36,26 @@ export default function ExtrasScreen({ route, navigation }) {
   const cardWidth = Math.floor(
     (width - H_PADDING * 2 - GAP * (numColumns - 1)) / numColumns
   );
+
+  // O conteudo do card e dimensionado para CONTENT_BASE px de largura util
+  // (tablet deitado, 4 colunas). Em telas mais estreitas tudo encolhe na mesma
+  // proporcao -- senao o seletor "- 2 +" vazaria para fora do card.
+  const s = Math.min(1, (cardWidth - spacing.md * 2) / CONTENT_BASE);
+  const dyn = useMemo(() => {
+    const px = (n) => Math.round(n * s);
+    const circle = (d) => ({ width: px(d), height: px(d), borderRadius: px(d) / 2 });
+    return {
+      emoji: { fontSize: px(60), lineHeight: px(72) },
+      name: { fontSize: px(28), lineHeight: px(34) },
+      price: { fontSize: px(32), lineHeight: px(38) },
+      addBtn: circle(64),
+      addIcon: px(28),
+      stepper: { gap: px(8), padding: px(5) },
+      stepBtn: circle(54),
+      stepIcon: px(22),
+      stepQty: { fontSize: px(28), minWidth: px(36) },
+    };
+  }, [s]);
 
   const [quantities, setQuantities] = useState({});
 
@@ -92,40 +129,42 @@ export default function ExtrasScreen({ route, navigation }) {
                     style={[styles.card, active && styles.cardActive, { width: cardWidth }]}
                   >
                     <View style={styles.cardBody}>
-                      <Text style={styles.cardEmoji}>{item.emoji}</Text>
-                      <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
-                      <Text style={styles.cardPrice}>R$ {item.price.toFixed(2)}</Text>
+                      <Text style={[styles.cardEmoji, dyn.emoji]}>{item.emoji}</Text>
+                      <Text style={[styles.cardName, dyn.name]} numberOfLines={2} adjustsFontSizeToFit>
+                        {item.name}
+                      </Text>
+                      <Text style={[styles.cardPrice, dyn.price]}>R$ {item.price.toFixed(2)}</Text>
                     </View>
 
                     <View style={styles.actionRow}>
                       {active ? (
-                        <View style={styles.stepper}>
+                        <View style={[styles.stepper, dyn.stepper]}>
                           <TouchableOpacity
-                            style={styles.stepBtn}
+                            style={[styles.stepBtn, dyn.stepBtn]}
                             onPress={() => dec(item.id)}
                             hitSlop={8}
                             activeOpacity={0.8}
                           >
-                            <Text style={styles.stepBtnText}>−</Text>
+                            <Sinal tamanho={dyn.stepIcon} cor={colors.white} />
                           </TouchableOpacity>
-                          <Text style={styles.stepQty}>{qty}</Text>
+                          <Text style={[styles.stepQty, dyn.stepQty]}>{qty}</Text>
                           <TouchableOpacity
-                            style={styles.stepBtnPlus}
+                            style={[styles.stepBtnPlus, dyn.stepBtn]}
                             onPress={() => inc(item.id)}
                             hitSlop={8}
                             activeOpacity={0.8}
                           >
-                            <Text style={styles.stepBtnPlusText}>+</Text>
+                            <Sinal mais tamanho={dyn.stepIcon} cor={colors.primary} />
                           </TouchableOpacity>
                         </View>
                       ) : (
                         <TouchableOpacity
-                          style={styles.addBtn}
+                          style={[styles.addBtn, dyn.addBtn]}
                           onPress={() => inc(item.id)}
                           hitSlop={8}
                           activeOpacity={0.8}
                         >
-                          <Text style={styles.addBtnText}>+</Text>
+                          <Sinal mais tamanho={dyn.addIcon} cor={colors.primary} />
                         </TouchableOpacity>
                       )}
                     </View>
@@ -188,6 +227,9 @@ const styles = StyleSheet.create({
   section: { gap: spacing.md },
   sectionLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 2, color: colors.gray400 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
+  // A largura do card e a da grade; so o CONTEUDO foi ampliado (~1,5x) e
+  // centralizado. Os tamanhos ficam em `dyn` (ExtrasScreen), que escala com a
+  // largura do card. A altura do card acompanha o conteudo.
   card: {
     minHeight: 190,
     backgroundColor: colors.cardBg,
@@ -195,37 +237,32 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.md,
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   cardActive: { borderColor: colors.gold, borderWidth: 2, backgroundColor: 'rgba(255,214,10,0.10)' },
-  cardBody: { gap: spacing.xs },
-  cardEmoji: { fontSize: 40 },
-  cardName: { fontSize: 20, fontWeight: '700', color: colors.white, lineHeight: 25 },
-  cardPrice: { fontSize: 22, fontWeight: '900', color: colors.gold },
-  actionRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: spacing.sm },
+  cardBody: { gap: spacing.sm, alignItems: 'center', width: '100%' },
+  cardEmoji: { textAlign: 'center' },
+  cardName: { fontWeight: '800', color: colors.white, textAlign: 'center' },
+  cardPrice: { fontWeight: '900', color: colors.gold, textAlign: 'center' },
+  actionRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: spacing.md },
   addBtn: {
-    width: 44, height: 44, borderRadius: 22,
     backgroundColor: colors.gold,
     alignItems: 'center', justifyContent: 'center',
   },
-  addBtnText: { fontSize: 28, fontWeight: '900', color: colors.primary, lineHeight: 30 },
   stepper: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.25)',
-    borderRadius: radius.full, padding: 4,
+    borderRadius: radius.full,
   },
   stepBtn: {
-    width: 36, height: 36, borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
   },
-  stepBtnText: { fontSize: 24, fontWeight: '900', color: colors.white, lineHeight: 26 },
-  stepQty: { fontSize: 18, fontWeight: '900', color: colors.white, minWidth: 22, textAlign: 'center' },
+  stepQty: { fontWeight: '900', color: colors.white, textAlign: 'center' },
   stepBtnPlus: {
-    width: 36, height: 36, borderRadius: 18,
     backgroundColor: colors.gold,
     alignItems: 'center', justifyContent: 'center',
   },
-  stepBtnPlusText: { fontSize: 24, fontWeight: '900', color: colors.primary, lineHeight: 26 },
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     padding: spacing.lg, backgroundColor: '#003566',
