@@ -72,7 +72,9 @@ export type EventType =
   | "payment_failed"
   | "amount_mismatch"
   | "replay_blocked"
-  | "rate_limited";
+  | "rate_limited"
+  | "attendant_confirmed"
+  | "attendant_rejected";
 
 /**
  * Grava um evento de auditoria.

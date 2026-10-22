@@ -15,6 +15,8 @@ import AdminLoginScreen from '../screens/AdminLoginScreen';
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
 import PendingOrdersScreen from '../screens/PendingOrdersScreen';
 import PhoneScreen from '../screens/PhoneScreen';
+import CallAttendantScreen from '../screens/CallAttendantScreen';
+import AttendantConfirmScreen from '../screens/AttendantConfirmScreen';
 
 const Stack = createStackNavigator();
 
@@ -30,6 +32,8 @@ export default function AppNavigator() {
         <Stack.Screen name="Extras" component={ExtrasScreen} />
         <Stack.Screen name="Checkout" component={CheckoutScreen} />
         <Stack.Screen name="Payment" component={PaymentScreen} />
+        <Stack.Screen name="CallAttendant" component={CallAttendantScreen} />
+        <Stack.Screen name="AttendantConfirm" component={AttendantConfirmScreen} />
         <Stack.Screen name="Confirmation" component={ConfirmationScreen} />
         <Stack.Screen name="AdminLogin" component={AdminLoginScreen} />
         <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />

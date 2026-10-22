@@ -1,7 +1,8 @@
 # Credenciais pendentes — FotoBarco
 
-Tudo que falta para o pagamento sair do papel. O código já está pronto nos dois
-métodos (cartão por aproximação e Pix); o que falta é o que só a empresa tem.
+Tudo que falta para o pagamento sair do papel. O código já está pronto: Pix pela
+InfinitePay, e crédito/débito/dinheiro recebidos pelo atendente, que libera as
+fotos com uma senha. O que falta é o que só a empresa tem.
 
 > **Nenhum valor deste documento deve ser enviado por WhatsApp, e-mail comum ou
 > colado em conversa.** São chaves de recebimento de dinheiro. Combine um canal
@@ -13,13 +14,13 @@ métodos (cartão por aproximação e Pix); o que falta é o que só a empresa t
 
 | # | Valor | Onde a empresa encontra | Usado para |
 |---|---|---|---|
-| 1 | **InfiniteTag** (sem o `@`) | App InfinitePay → Perfil → InfiniteTag | Identifica a conta que **recebe** o dinheiro. Vale para cartão e Pix. |
-| 2 | **CNPJ ou CPF da conta InfinitePay** (só dígitos) | Documento cadastrado na conta InfinitePay | Conferido no retorno da cobrança, para garantir que a venda caiu na conta certa. |
+| 1 | **InfiniteTag** (sem o `@`) | App InfinitePay → Perfil → InfiniteTag | Identifica a conta que **recebe** o Pix. |
+| 2 | **Senha do atendente** (6+ caracteres) | Definida pela empresa | Digitada no tablet para liberar as fotos de quem pagou com cartão ou dinheiro. |
 | 3 | **E-mail do admin do painel** | Definido pela empresa | Login do painel e autorização para liberar um Pix na mão. |
 | 4 | **Senha desse admin** | Definida pela empresa | Mesma coisa. Troque depois do primeiro acesso. |
 
-Itens 1 e 2 são os que travam o sistema: sem eles as funções de pagamento nem
-sobem.
+O item 1 trava o sistema: sem ele as funções de pagamento nem sobem. Sem o
+item 2, o Pix funciona, mas cartão e dinheiro não conseguem ser liberados.
 
 ---
 
@@ -30,10 +31,14 @@ que o tablet não consegue ler:
 
 ```bash
 supabase secrets set INFINITEPAY_HANDLE=<InfiniteTag sem @>
-supabase secrets set INFINITEPAY_DOC_NUMBER=<CNPJ só dígitos>
 supabase secrets set APP_DEEPLINK_SCHEME=fotobarco
+supabase secrets set ATTENDANT_PASSWORD=<senha do atendente>
 supabase secrets set ADMIN_EMAIL=<e-mail do admin>
 ```
+
+A senha do atendente **não** pode ir para o app: dentro do APK ela seria
+legível por qualquer pessoa. Para trocá-la, basta rodar o `secrets set` de novo
+— não precisa publicar app novo.
 
 `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` são injetados pela própria
 plataforma — não precisam ser informados e não devem ir para o `.env`.

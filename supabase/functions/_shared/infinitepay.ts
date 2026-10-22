@@ -1,84 +1,34 @@
 // =============================================================================
-// CLIENTE InfinitePay -- InfiniteTap (cartao presencial) + Checkout (Pix)
+// CLIENTE InfinitePay -- Checkout (Pix)
 // =============================================================================
-// Dois caminhos de cobranca, um provedor so:
+// O unico pagamento integrado e o Pix: cria um link de pagamento; o tablet
+// mostra o QR Code desse link, o cliente escaneia com o celular dele e paga.
+// (Credito, debito e dinheiro sao recebidos pelo atendente -- ver
+// payment-attendant-confirm.)
 //
-//   CARTAO (InfiniteTap): deeplink abre o app InfinitePay, cliente aproxima o
-//   cartao no proprio tablet, retorno volta por deeplink.
-//
-//   PIX (Checkout): cria um link de pagamento; o tablet mostra o QR Code desse
-//   link, o cliente escaneia com o celular dele e paga.
-//
-// REGRA QUE VALE PARA OS DOIS:
-//   Nem o retorno do deeplink nem o webhook sao prova de pagamento.
-//   - O deeplink chega pelo aparelho do cliente e pode ser forjado por qualquer
-//     app instalado.
-//   - O webhook da InfinitePay NAO tem assinatura HMAC, entao qualquer um que
-//     descubra a URL consegue postar "pago" nela.
-//   Os dois servem apenas como AVISO de que algo aconteceu. A unica prova
-//   aceita e a resposta de checkTransaction() -- perguntar direto ao provedor.
+// O webhook da InfinitePay NAO tem assinatura HMAC, entao qualquer um que
+// descubra a URL consegue postar "pago" nela. Ele serve apenas como AVISO de
+// que algo aconteceu. A unica prova aceita e a resposta de checkTransaction()
+// -- perguntar direto ao provedor.
 // =============================================================================
 
 import { config } from "./config.ts";
 
 const CHECKOUT_API = "https://api.checkout.infinitepay.io";
 
-// =============================================================================
-// 1. CARTAO -- InfiniteTap por deeplink
-// =============================================================================
-// infinitepaydash://infinitetap-app
-//   ?amount=<CENTAVOS>&payment_method=credit|debit&installments=<1..12>
-//   &order_id=<nsu>&result_url=<retorno>&app_client_referrer=<app>
-//   &handle=<InfiniteTag>&doc_number=<CNPJ>&af_force_deeplink=true
-
-const INFINITETAP_BASE = "infinitepaydash://infinitetap-app";
-
-export interface DeeplinkParams {
-  amountCents: number;
-  paymentMethod: "credit" | "debit";
-  installments: number;
-  orderNsu: string;
-}
-
-export function buildInfiniteTapDeeplink(p: DeeplinkParams): string {
-  const resultUrl = `${config.app.deeplinkScheme}://payment/result`;
-
-  const params = new URLSearchParams({
-    amount: String(p.amountCents),        // SEMPRE centavos: 10000 = R$ 100,00
-    payment_method: p.paymentMethod,
-    installments: String(p.installments),
-    order_id: p.orderNsu,
-    result_url: resultUrl,                // URLSearchParams ja faz o encode
-    app_client_referrer: config.infinitepay.appClientReferrer,
-    handle: config.infinitepay.handle,
-    doc_number: config.infinitepay.docNumber,
-    af_force_deeplink: "true",            // necessario no iOS
-  });
-
-  return `${INFINITETAP_BASE}?${params.toString()}`;
-}
-
-/**
- * Regra da InfinitePay: cada parcela precisa valer ao menos R$ 1,00.
- * R$ 100,00 em 12x = R$ 8,33 -> ok. R$ 10,00 em 12x -> recusado.
- */
-export function maxInstallmentsFor(amountCents: number): number {
-  return Math.max(1, Math.min(12, Math.floor(amountCents / 100)));
-}
-
-/** Retorno do deeplink. DADO NAO CONFIAVEL -- so um aviso de que o cliente voltou. */
-export interface TapResult {
-  order_id?: string;
-  nsu?: string;              // uuid da transacao
-  aut?: string;              // codigo de autorizacao
-  card_brand?: string;
-  handle?: string;
-  merchant_document?: string;
-  warning?: string;          // presente = transacao NAO concluida
+/** O handle so e obrigatorio para o Pix; falha aqui, e nao no boot. */
+function requireHandle(): string {
+  const handle = config.infinitepay.handle;
+  if (!handle) {
+    throw new Error(
+      "SECRET_AUSENTE: INFINITEPAY_HANDLE. Cadastre com: supabase secrets set INFINITEPAY_HANDLE=<valor>",
+    );
+  }
+  return handle;
 }
 
 // =============================================================================
-// 2. PIX -- Checkout por link de pagamento
+// 1. PIX -- Checkout por link de pagamento
 // =============================================================================
 
 export interface CheckoutLinkParams {
@@ -105,9 +55,9 @@ export interface CheckoutLink {
  */
 export async function createCheckoutLink(p: CheckoutLinkParams): Promise<CheckoutLink> {
   const body: Record<string, unknown> = {
-    handle: config.infinitepay.handle,
+    handle: requireHandle(),
 
-    // 'price' em centavos, igual ao deeplink. Um item unico com o total ja
+    // 'price' em centavos. Um item unico com o total ja
     // calculado pelo servidor -- o detalhamento (fotos, extras) fica no nosso
     // banco, nao precisa trafegar para o provedor.
     items: [{
@@ -168,7 +118,7 @@ export async function createCheckoutLink(p: CheckoutLinkParams): Promise<Checkou
 }
 
 // =============================================================================
-// 3. CONFERENCIA -- a unica prova de pagamento aceita
+// 2. CONFERENCIA -- a unica prova de pagamento aceita
 // =============================================================================
 
 export interface ProviderCheck {
@@ -192,7 +142,7 @@ export async function checkTransaction(args: {
   slug?: string | null;
 }): Promise<ProviderCheck> {
   const body = {
-    handle: config.infinitepay.handle,
+    handle: requireHandle(),
     order_nsu: args.orderNsu,
     transaction_nsu: args.transactionNsu,
     ...(args.slug ? { slug: args.slug } : {}),
@@ -240,7 +190,7 @@ export async function checkTransaction(args: {
 }
 
 // =============================================================================
-// 4. WEBHOOK -- formato do que a InfinitePay posta
+// 3. WEBHOOK -- formato do que a InfinitePay posta
 // =============================================================================
 // {
 //   "invoice_slug": "abc123",

@@ -14,8 +14,9 @@ import { supabase } from './supabase';
 //   Marcava status='paid' a partir do app. Quem controla o aparelho liberaria
 //   fotos sem pagar. (Na pratica ja falhava: nao existe policy de UPDATE em
 //   orders para o anon -- o fluxo nunca funcionou de ponta a ponta.)
-//   -> Agora quem confirma e a Edge Function payment-confirm, depois de
-//      perguntar a InfinitePay se a transacao existe e o valor bate.
+//   -> Agora quem confirma e o servidor: o Pix depois de perguntar a
+//      InfinitePay se a transacao existe e o valor bate; cartao/dinheiro
+//      depois de conferir a senha do atendente (payment-attendant-confirm).
 //
 // Se precisar criar pedido ou confirmar pagamento, use services/infinitepay.js.
 // Nao traga estes metodos de volta.

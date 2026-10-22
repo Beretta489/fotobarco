@@ -1,18 +1,13 @@
 // =============================================================================
-// TELA DE PAGAMENTO -- Pix (QR Code) e Cartao (InfiniteTap)
+// TELA DE PAGAMENTO -- Pix (QR Code)
 // =============================================================================
-// Dois fluxos com formatos opostos:
+// Mostra o QR Code na tela; o cliente escaneia com o celular dele. O app fica
+// aqui, perguntando ao servidor se ja caiu.
 //
-//   PIX     -> mostra QR Code na tela; o cliente escaneia com o celular dele.
-//              O app fica aqui, perguntando ao servidor se ja caiu.
+// Esta tela nunca decide que um pagamento aconteceu. Ela so mostra o que o
+// servidor respondeu -- quem confirma e a Edge Function.
 //
-//   CARTAO  -> SAI do app, abre o InfinitePay, o cliente aproxima o cartao no
-//              proprio tablet, e o resultado volta por deeplink.
-//
-// REGRA QUE VALE PARA OS DOIS:
-//   Esta tela nunca decide que um pagamento aconteceu. Ela so mostra o que o
-//   servidor respondeu. O retorno do deeplink e tratado como "o cliente voltou",
-//   nunca como "o cliente pagou" -- quem confirma e a Edge Function.
+// (Credito, debito e dinheiro nao passam por aqui: vao para CallAttendant.)
 // =============================================================================
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -23,7 +18,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import QRCode from 'react-native-qrcode-svg';
 import { infinitePayService, mensagemDeErro } from '../services/infinitepay';
-import { onTapResult, limparResultadoPendente } from '../utils/deeplink';
 import { colors, spacing, radius } from '../utils/theme';
 
 const PIX_POLL_MS = 3000;
@@ -33,8 +27,6 @@ const PIX_POLL_MS = 3000;
 const FASE = {
   CRIANDO: 'criando',           // pedindo a cobranca ao servidor
   PIX_AGUARDANDO: 'pix',        // QR na tela, perguntando se caiu
-  TAP_ABRINDO: 'tap_abrindo',   // saindo para o app InfinitePay
-  TAP_AGUARDANDO: 'tap_espera', // fora do app, esperando voltar
   CONFIRMANDO: 'confirmando',   // servidor conferindo com a InfinitePay
   ERRO: 'erro',
 };
@@ -42,10 +34,8 @@ const FASE = {
 export default function PaymentScreen({ route, navigation }) {
   const {
     session, group, photoIds, photos, packageType,
-    extras = [], clientPhone, paymentMethod = 'pix', totalEstimado = 0,
+    extras = [], clientPhone, totalEstimado = 0,
   } = route.params;
-
-  const ehPix = paymentMethod === 'pix';
 
   const [fase, setFase] = useState(FASE.CRIANDO);
   const [erro, setErro] = useState('');
@@ -59,13 +49,6 @@ export default function PaymentScreen({ route, navigation }) {
   const timerRef = useRef(null);
   const montadoRef = useRef(true);
   const criandoRef = useRef(false);   // trava contra criar duas cobrancas
-
-  // O retorno do Tap pode chegar ANTES de 'intent' existir no estado -- basta o
-  // cliente pagar muito rapido, ou o Android reabrir o app pelo proprio
-  // deeplink. Ler o intent por ref (em vez do estado capturado no closure) e
-  // guardar o retorno orfao evita perder um pagamento ja efetuado.
-  const intentRef = useRef(null);
-  const retornoOrfaoRef = useRef(null);
 
   // Valor exibido: enquanto o servidor nao responde, usa a estimativa da tela
   // anterior. Assim que o intent chega, passa a mostrar o valor REAL cobrado.
@@ -89,8 +72,6 @@ export default function PaymentScreen({ route, navigation }) {
     return () => {
       montadoRef.current = false;
       limparTimers();
-      // Retorno que chegue depois de sair da tela nao interessa mais.
-      limparResultadoPendente();
     };
   }, [limparTimers, pulse]);
 
@@ -139,8 +120,7 @@ export default function PaymentScreen({ route, navigation }) {
         photoIds,
         extras,
         clientPhone,
-        paymentMethod,
-        installments: 1,
+        paymentMethod: 'pix',
       });
 
       if (!montadoRef.current) return;
@@ -159,20 +139,15 @@ export default function PaymentScreen({ route, navigation }) {
         });
       }, 1000);
 
-      if (ehPix) {
-        setFase(FASE.PIX_AGUARDANDO);
-        iniciarPollingPix(resposta.orderNsu);
-      } else {
-        setFase(FASE.TAP_ABRINDO);
-        await abrirTap(resposta.deeplink);
-      }
+      setFase(FASE.PIX_AGUARDANDO);
+      iniciarPollingPix(resposta.orderNsu);
     } catch (e) {
       falhar(e.code, true);
     } finally {
       criandoRef.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, group, packageType, photoIds, extras, clientPhone, paymentMethod, ehPix]);
+  }, [session, group, packageType, photoIds, extras, clientPhone]);
 
   useEffect(() => { abrirCobranca(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -201,71 +176,6 @@ export default function PaymentScreen({ route, navigation }) {
     }, PIX_POLL_MS);
   }, [concluir, falhar]);
 
-  // ------------------------------------------------------------ 2b. CARTAO --
-  const abrirTap = useCallback(async (deeplink) => {
-    try {
-      await infinitePayService.openTap(deeplink);
-      if (montadoRef.current) setFase(FASE.TAP_AGUARDANDO);
-    } catch (e) {
-      falhar(e.code, true);
-    }
-  }, [falhar]);
-
-  /** Manda o retorno do Tap para o servidor conferir. */
-  const processarRetornoTap = useCallback(async (resultado) => {
-    if (!montadoRef.current) return;
-    setFase(FASE.CONFIRMANDO);
-
-    try {
-      const r = await infinitePayService.confirmTap({
-        orderNsu: resultado.orderNsu,
-        transactionNsu: resultado.transactionNsu,
-        aut: resultado.aut,
-        cardBrand: resultado.cardBrand,
-        warning: resultado.warning,
-      });
-      if (r.status === 'paid') concluir(r);
-      else falhar(r.error || 'PAGAMENTO_NAO_CONFIRMADO', true);
-    } catch (e) {
-      // PROVEDOR_INDISPONIVEL vem com retry: o dinheiro pode ter sido
-      // capturado, entao oferecemos reconferir em vez de refazer o pedido.
-      falhar(e.code, true);
-    }
-  }, [concluir, falhar]);
-
-  // Mantem a ref em dia e resgata um retorno que tenha chegado cedo demais.
-  useEffect(() => {
-    intentRef.current = intent;
-    if (intent && retornoOrfaoRef.current) {
-      const pendente = retornoOrfaoRef.current;
-      retornoOrfaoRef.current = null;
-      if (pendente.orderNsu === intent.orderNsu) processarRetornoTap(pendente);
-    }
-  }, [intent, processarRetornoTap]);
-
-  // Escuta o retorno do InfiniteTap. Inscrito uma unica vez (nao depende de
-  // 'intent'), para nao haver janela em que o listener esta fora do ar.
-  useEffect(() => {
-    if (ehPix) return undefined;
-
-    const cancelar = onTapResult((resultado) => {
-      if (!montadoRef.current) return;
-
-      const atual = intentRef.current;
-      if (!atual) {
-        // Cobranca ainda nao registrada no estado: guarda em vez de descartar.
-        // Descartar aqui significaria perder um pagamento ja efetuado.
-        retornoOrfaoRef.current = resultado;
-        return;
-      }
-      if (resultado.orderNsu !== atual.orderNsu) return;  // retorno de outro pedido
-
-      processarRetornoTap(resultado);
-    });
-
-    return cancelar;
-  }, [ehPix, processarRetornoTap]);
-
   /** Reconfere sem criar pedido novo -- para quando a confirmacao falhou. */
   const reconferir = useCallback(async () => {
     if (!intent) return;
@@ -293,9 +203,6 @@ export default function PaymentScreen({ route, navigation }) {
   const relogio = `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
   const expirou = tempoRestante === 0 && intent && fase === FASE.PIX_AGUARDANDO;
 
-  const titulo = ehPix ? 'Pagamento via Pix'
-    : paymentMethod === 'debit' ? 'Pagamento Débito' : 'Pagamento Crédito';
-
   return (
     <LinearGradient
       colors={['#003566', '#0077B6', '#00B4D8']}
@@ -311,7 +218,7 @@ export default function PaymentScreen({ route, navigation }) {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.dolphin}>🐬</Text>
-          <Text style={styles.title}>{titulo}</Text>
+          <Text style={styles.title}>Pagamento via Pix</Text>
         </View>
         <View style={{ width: 70 }} />
       </View>
@@ -328,9 +235,7 @@ export default function PaymentScreen({ route, navigation }) {
         {fase === FASE.CRIANDO && (
           <View style={styles.box}>
             <ActivityIndicator color={colors.gold} size="large" />
-            <Text style={styles.boxText}>
-              {ehPix ? 'Gerando o Pix...' : 'Preparando a maquininha...'}
-            </Text>
+            <Text style={styles.boxText}>Gerando o Pix...</Text>
           </View>
         )}
 
@@ -389,29 +294,6 @@ export default function PaymentScreen({ route, navigation }) {
               <Text style={styles.boxText}>Aguardando confirmação do pagamento...</Text>
             </View>
           </>
-        )}
-
-        {/* ----------------------------------------------------- CARTAO ---- */}
-        {(fase === FASE.TAP_ABRINDO || fase === FASE.TAP_AGUARDANDO) && (
-          <View style={styles.box}>
-            <Text style={styles.bigEmoji}>💳</Text>
-            <Text style={styles.boxTitle}>
-              {fase === FASE.TAP_ABRINDO ? 'Abrindo a maquininha...' : 'Aguardando o pagamento'}
-            </Text>
-            <Text style={styles.boxText}>
-              Peça para o cliente aproximar o cartão no aparelho.{'\n'}
-              Ao terminar, você volta para cá automaticamente.
-            </Text>
-            <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.sm }} />
-
-            {/* Saida manual: se o app InfinitePay travar ou o operador voltar
-                sem concluir, da para reconferir sem refazer o pedido. */}
-            {fase === FASE.TAP_AGUARDANDO && (
-              <TouchableOpacity style={styles.secondaryBtn} onPress={reconferir}>
-                <Text style={styles.secondaryText}>Verificar pagamento</Text>
-              </TouchableOpacity>
-            )}
-          </View>
         )}
 
         {/* ------------------------------------------------- confirmando ---- */}

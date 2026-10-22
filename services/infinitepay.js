@@ -1,19 +1,19 @@
 // =============================================================================
-// CLIENTE DE PAGAMENTO -- InfiniteTap (cartao) + Checkout (Pix)
+// CLIENTE DE PAGAMENTO -- Pix (Checkout) + liberacao pelo atendente
 // =============================================================================
 // Este arquivo roda no tablet. Tudo aqui e publico: qualquer pessoa que baixe o
 // APK consegue ler estas linhas e os valores embutidos nelas.
 //
 // Por isso este arquivo NAO TEM e NAO PODE TER:
 //   - chave de API, client secret, token de provedor de pagamento
+//   - a senha do atendente
 //   - calculo de quanto cobrar
 //   - qualquer caminho que marque um pedido como pago
 //
-// Ele so: pede a cobranca ao servidor, abre o app da InfinitePay (ou mostra o
-// QR do Pix) e repassa o retorno para o servidor conferir.
+// Ele so: pede a cobranca ao servidor, pergunta se o Pix caiu e repassa a
+// senha digitada pelo atendente para o servidor conferir.
 // =============================================================================
 
-import { Linking } from 'react-native';
 import Constants from 'expo-constants';
 import { supabase } from './supabase';
 
@@ -74,7 +74,7 @@ export const infinitePayService = {
   /**
    * Abre uma cobranca e devolve o que a tela precisa.
    *
-   * Cartao -> { deeplink }   Pix -> { checkoutUrl }
+   * Pix -> { checkoutUrl }   credit/debit/cash -> so o valor e o orderNsu
    *
    * Repare que NAO existe parametro de valor. O servidor recalcula o preco a
    * partir do catalogo dele -- se um dia alguem adicionar `total` aqui, a
@@ -87,8 +87,7 @@ export const infinitePayService = {
     photoIds,
     extras = [],
     clientPhone = null,
-    paymentMethod = 'credit',
-    installments = 1,
+    paymentMethod = 'pix',
   }) {
     return callFunction('payment-intent-create', {
       sessionId,
@@ -99,37 +98,18 @@ export const infinitePayService = {
       extras: extras.map((e) => ({ id: e.id, quantity: e.quantity })),
       clientPhone,
       paymentMethod,
-      installments,
     }, { timeoutMs: 30000 });   // Pix cria link no provedor: pode demorar mais
   },
 
   /**
-   * Abre o app da InfinitePay para cobrar no cartao (InfiniteTap).
+   * Libera um pagamento em credito, debito ou dinheiro com a senha do
+   * atendente.
    *
-   * Requer o app "InfinitePay Tap, Conta, Cartão" instalado E logado na conta
-   * que vai receber. Em aparelho sem o app, canOpenURL devolve false.
+   * A senha e conferida SO no servidor. Este app nunca sabe qual e a senha
+   * certa -- se soubesse, ela estaria dentro do APK.
    */
-  async openTap(deeplink) {
-    const canOpen = await Linking.canOpenURL(deeplink).catch(() => false);
-    if (!canOpen) {
-      const err = new Error('APP_INFINITEPAY_NAO_INSTALADO');
-      err.code = 'APP_INFINITEPAY_NAO_INSTALADO';
-      throw err;
-    }
-    await Linking.openURL(deeplink);
-  },
-
-  /**
-   * Repassa o retorno do deeplink (cartao) para o servidor conferir.
-   *
-   * IMPORTANTE: o retorno de sucesso desta funcao e a UNICA coisa que autoriza
-   * mostrar as fotos. Nunca libere nada olhando so para os parametros do
-   * deeplink -- eles chegam pelo aparelho e podem ser forjados.
-   */
-  async confirmTap({ orderNsu, transactionNsu, aut, cardBrand, warning }) {
-    return callFunction('payment-confirm', {
-      orderNsu, transactionNsu, aut, cardBrand, warning,
-    });
+  async confirmarAtendente({ orderNsu, password }) {
+    return callFunction('payment-attendant-confirm', { orderNsu, password });
   },
 
   /**
@@ -173,46 +153,6 @@ export const infinitePayService = {
   },
 };
 
-// =============================================================================
-// RETORNO DO DEEPLINK
-// =============================================================================
-
-/**
- * Extrai os parametros do deeplink de retorno da InfinitePay.
- *
- * Formato: fotobarco://payment/result?order_id=...&nsu=...&aut=...
- *
- * O objeto devolvido e DADO NAO CONFIAVEL. Serve para saber que o cliente
- * voltou da maquininha e alimentar confirmTap() -- nada alem disso.
- */
-export function parseTapResult(url) {
-  try {
-    const query = String(url).split('?')[1];
-    if (!query) return null;
-
-    const params = new URLSearchParams(query);
-    const orderNsu = params.get('order_id');
-    if (!orderNsu) return null;
-
-    return {
-      orderNsu,
-      transactionNsu: params.get('nsu') || null,
-      aut: params.get('aut') || null,
-      cardBrand: params.get('card_brand') || null,
-      handle: params.get('handle') || null,
-      // Presenca de 'warning' = transacao nao concluida.
-      warning: params.get('warning') || null,
-    };
-  } catch (_) {
-    return null;
-  }
-}
-
-/** true se a URL e o retorno do InfiniteTap. */
-export function isTapResultUrl(url) {
-  return typeof url === 'string' && url.includes('payment/result');
-}
-
 /**
  * Mensagens para o operador do tablet.
  *
@@ -222,12 +162,8 @@ export function isTapResultUrl(url) {
  */
 export function mensagemDeErro(code) {
   const mapa = {
-    APP_INFINITEPAY_NAO_INSTALADO:
-      'O app InfinitePay nao esta instalado neste aparelho.',
     SEM_CONEXAO:
       'Sem conexao. Verifique a internet e tente novamente.',
-    PAGAMENTO_RECUSADO:
-      'Pagamento recusado. Tente outro cartao.',
     PAGAMENTO_NAO_CONFIRMADO:
       'Nao conseguimos confirmar o pagamento. Se o valor foi debitado, chame o responsavel.',
     PAGAMENTO_EXPIRADO:
@@ -245,9 +181,19 @@ export function mensagemDeErro(code) {
     NAO_FOI_POSSIVEL_CALCULAR_O_VALOR:
       'Nao foi possivel calcular o valor do pedido. Refaca a selecao.',
     FALHA_AO_GERAR_PIX:
-      'Nao foi possivel gerar o Pix. Tente novamente ou use cartao.',
+      'Nao foi possivel gerar o Pix. Tente novamente ou pague com o atendente.',
     PAGAMENTO_NAO_ENCONTRADO:
       'Pagamento nao encontrado. Refaca o pedido.',
+
+    // --- liberacao pelo atendente (payment-attendant-confirm) ------------
+    SENHA_INCORRETA:
+      'Senha incorreta.',
+    SENHA_AUSENTE:
+      'Digite a senha do atendente.',
+    BLOQUEIO_TEMPORARIO:
+      'Muitas senhas erradas. Aguarde alguns minutos e tente de novo.',
+    LIBERACAO_DESATIVADA:
+      'Liberacao pelo atendente nao configurada. Chame o responsavel.',
 
     // --- recuperacao manual do Pix (payment-recover) ---------------------
     NAO_AUTORIZADO:

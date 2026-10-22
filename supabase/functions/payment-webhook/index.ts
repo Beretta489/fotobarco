@@ -9,8 +9,8 @@
 // │                                                                         │
 // │   supabase functions deploy payment-webhook --no-verify-jwt             │
 // │                                                                         │
-// │ As outras duas (payment-intent-create, payment-confirm) NAO levam essa  │
-// │ flag: elas so devem aceitar chamadas do app autenticado.                │
+// │ As outras functions NAO levam essa flag: elas so devem aceitar          │
+// │ chamadas do app autenticado.                                            │
 // └─────────────────────────────────────────────────────────────────────────┘
 //
 // ESTE ENDPOINT E PUBLICO E SEM ASSINATURA.

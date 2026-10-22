@@ -1,5 +1,5 @@
 // =============================================================================
-// payment-intent-create -- abre uma cobranca (InfiniteTap ou Pix)
+// payment-intent-create -- abre uma cobranca (Pix ou atendente)
 // =============================================================================
 // O app manda O QUE o cliente escolheu. Nunca QUANTO custa.
 //
@@ -11,23 +11,20 @@
 //     "photoIds":      ["uuid", ...],
 //     "extras":        [{ "id": "coca-lata", "quantity": 2 }],   // opcional
 //     "clientPhone":   "84999998888",                            // opcional
-//     "paymentMethod": "credit" | "debit" | "pix",
-//     "installments":  1
+//     "paymentMethod": "pix" | "credit" | "debit" | "cash"
 //   }
 //
-// Saida (cartao):  { ok, intentId, orderId, orderNsu, amountCents, deeplink }
-// Saida (pix):     { ok, intentId, orderId, orderNsu, amountCents, checkoutUrl }
+// Saida (pix):        { ok, intentId, orderId, orderNsu, amountCents, checkoutUrl }
+// Saida (atendente):  { ok, intentId, orderId, orderNsu, amountCents }
+//   credit/debit/cash nao tem cobranca integrada: o atendente recebe fora do
+//   app e libera com a senha em payment-attendant-confirm.
 //
 // Repare que 'total' NAO aparece na entrada. Se um dia aparecer, e bug.
 // =============================================================================
 
 import { config, corsHeaders, errorResponse, json } from "../_shared/config.ts";
 import { generateOrderNsu, logEvent, serviceClient } from "../_shared/db.ts";
-import {
-  buildInfiniteTapDeeplink,
-  createCheckoutLink,
-  maxInstallmentsFor,
-} from "../_shared/infinitepay.ts";
+import { createCheckoutLink } from "../_shared/infinitepay.ts";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-9a-f][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -58,8 +55,8 @@ Deno.serve(async (req) => {
       return errorResponse("PACOTE_INVALIDO");
     }
 
-    const paymentMethod = String(body.paymentMethod ?? "credit");
-    if (!["credit", "debit", "pix"].includes(paymentMethod)) {
+    const paymentMethod = String(body.paymentMethod ?? "pix");
+    if (!["pix", "credit", "debit", "cash"].includes(paymentMethod)) {
       return errorResponse("METODO_PAGAMENTO_INVALIDO");
     }
 
@@ -114,17 +111,9 @@ Deno.serve(async (req) => {
       return errorResponse("NAO_FOI_POSSIVEL_CALCULAR_O_VALOR", 422);
     }
 
-    // ------------------------------------------------------------ parcelas --
-    let installments = Number(body.installments ?? 1);
-    if (!Number.isInteger(installments) || installments < 1) installments = 1;
-
-    // Parcela minima de R$ 1,00 (regra da InfinitePay). Corrigir aqui evita
-    // mandar o cliente para uma tela que vai recusar.
-    const maxInstallments = maxInstallmentsFor(amountCents);
-    if (installments > maxInstallments) installments = maxInstallments;
-
-    // Nem debito nem Pix parcelam.
-    if (paymentMethod === "debit" || paymentMethod === "pix") installments = 1;
+    // Parcelamento, se houver, e combinado na maquininha do atendente -- o
+    // valor do pedido e o mesmo. Aqui fica sempre 1.
+    const installments = 1;
 
     // ------------------------------------------------------ cria o pedido --
     const { data: order, error: orderError } = await db
@@ -178,7 +167,10 @@ Deno.serve(async (req) => {
 
     // ------------------------------------------------------ cria o intent --
     const orderNsu = generateOrderNsu();
-    const expiresAt = new Date(Date.now() + config.intentTtlMinutes * 60_000);
+    const ttlMinutes = paymentMethod === "pix"
+      ? config.intentTtlMinutes
+      : config.attendant.intentTtlMinutes;
+    const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
 
     // --- Pix: cria o link de checkout ANTES de gravar o intent -------------
     // Se a InfinitePay recusar, nao queremos um intent orfao apontando para uma
@@ -253,16 +245,9 @@ Deno.serve(async (req) => {
       return json({ ...base, checkoutUrl });
     }
 
-    return json({
-      ...base,
-      installments,
-      deeplink: buildInfiniteTapDeeplink({
-        amountCents,
-        paymentMethod: paymentMethod as "credit" | "debit",
-        installments,
-        orderNsu,
-      }),
-    });
+    // Credito, debito e dinheiro: nada a cobrar daqui. O tablet mostra o
+    // valor e chama o atendente.
+    return json(base);
   } catch (e) {
     console.error("[intent] erro inesperado", e);
     return errorResponse("ERRO_INTERNO", 500);

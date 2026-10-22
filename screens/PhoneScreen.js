@@ -47,7 +47,8 @@ export default function PhoneScreen({ route, navigation }) {
     }
     setError('');
 
-    navigation.navigate('Payment', {
+    // Pix cobra pelo QR Code; o resto e recebido pelo atendente.
+    navigation.navigate(paymentMethod === 'pix' ? 'Payment' : 'CallAttendant', {
       // Dados do pedido -- a cobranca e aberta na tela seguinte.
       session,
       group,
@@ -132,6 +133,7 @@ export default function PhoneScreen({ route, navigation }) {
               { id: 'pix',    rotulo: '⚡ Pix' },
               { id: 'credit', rotulo: '💳 Crédito' },
               { id: 'debit',  rotulo: '💳 Débito' },
+              { id: 'cash',   rotulo: '💵 Dinheiro' },
             ].map((opcao) => (
               <TouchableOpacity
                 key={opcao.id}
@@ -149,11 +151,10 @@ export default function PhoneScreen({ route, navigation }) {
             ))}
           </View>
 
-          {/* Crédito e débito cobram no proprio tablet, por aproximacao. */}
           <Text style={styles.payHint}>
             {paymentMethod === 'pix'
               ? 'QR Code na tela — o cliente paga pelo celular dele'
-              : 'Maquininha no tablet — o cliente aproxima o cartão'}
+              : 'Pagamento com o atendente — ele confirma no tablet'}
           </Text>
         </View>
 
@@ -238,20 +239,19 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm,
   },
   payLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 2, color: colors.gray400 },
+  // Grade 2x2: quatro opcoes numa linha so ficariam apertadas em tablet estreito.
   payRow: {
-    flexDirection: 'row', gap: spacing.sm,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: radius.full, padding: 4,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm,
+    justifyContent: 'space-between',
   },
   payBtn: {
-    flex: 1, paddingVertical: spacing.sm, paddingHorizontal: 2,
+    width: '48%', paddingVertical: spacing.md, paddingHorizontal: 2,
     alignItems: 'center', borderRadius: radius.full,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  payBtnActive: { backgroundColor: colors.gold },
-  // Fonte e letterSpacing menores que antes: agora sao 3 opcoes na mesma linha,
-  // e "Crédito"/"Débito" precisam caber sem quebrar em tablet estreito.
-  payText: { fontSize: 13, fontWeight: '700', color: colors.accentLight, letterSpacing: 0.5 },
+  payBtnActive: { backgroundColor: colors.gold, borderColor: colors.gold },
+  payText: { fontSize: 15, fontWeight: '700', color: colors.accentLight, letterSpacing: 0.5 },
   payTextActive: { color: colors.primary },
   payHint: { fontSize: 12, color: colors.gray400, textAlign: 'center', marginTop: 2 },
   continueBtn: { width: '100%', borderRadius: radius.full, overflow: 'hidden' },

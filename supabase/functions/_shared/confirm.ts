@@ -1,17 +1,20 @@
 // =============================================================================
 // CONFIRMACAO DE PAGAMENTO -- o coracao da seguranca do sistema
 // =============================================================================
-// Tres caminhos diferentes podem dizer "esse pedido foi pago":
+// Tres caminhos diferentes podem dizer "esse Pix foi pago":
 //
-//   1. payment-confirm  -- o app, depois do retorno do deeplink (InfiniteTap)
-//   2. payment-webhook  -- a InfinitePay, quando o Pix cai
-//   3. payment-status   -- o app, perguntando de tempos em tempos (Pix)
+//   1. payment-webhook  -- a InfinitePay, quando o Pix cai
+//   2. payment-status   -- o app, perguntando de tempos em tempos
+//   3. payment-recover  -- o admin logado, liberando um Pix na mao
 //
 // NENHUM dos tres e confiavel por si so:
-//   - o deeplink chega pelo aparelho do cliente e pode ser forjado;
 //   - o webhook da InfinitePay NAO tem assinatura, entao qualquer um que
 //     descubra a URL consegue posta-lo;
-//   - o polling e disparado pelo proprio app.
+//   - o polling e disparado pelo proprio app;
+//   - o NSU da recuperacao e digitado a partir de um comprovante.
+//
+// (Credito, debito e dinheiro NAO passam por aqui: sao liberados pela senha do
+// atendente em payment-attendant-confirm, que reaproveita releaseIntent().)
 //
 // Por isso os tres entram AQUI, e aqui as mesmas cinco validacoes sao aplicadas
 // antes de qualquer pedido virar 'paid'. Centralizar e proposital: se cada
@@ -41,7 +44,7 @@ export interface ConfirmInput {
    *                 aceita um intent ja expirado, dentro de recoveryWindowDays.
    *                 Todas as outras validacoes continuam valendo.
    */
-  source: "deeplink" | "webhook" | "polling" | "recovery";
+  source: "webhook" | "polling" | "recovery";
   /** Dados opcionais do cartao, para o comprovante. */
   aut?: string | null;
   cardBrand?: string | null;
@@ -81,6 +84,12 @@ export async function confirmIntent(
   // Resposta identica para "nao existe" e "nao e seu": nao confirmamos a
   // existencia de um nsu para quem esta sondando.
   if (!intent) {
+    return { status: "not_found", httpStatus: 404, code: "PAGAMENTO_NAO_ENCONTRADO" };
+  }
+
+  // Credito, debito e dinheiro so saem pela senha do atendente
+  // (payment-attendant-confirm). Este caminho e exclusivo do Pix.
+  if (intent.payment_method !== "pix") {
     return { status: "not_found", httpStatus: 404, code: "PAGAMENTO_NAO_ENCONTRADO" };
   }
 
@@ -224,7 +233,7 @@ export async function confirmIntent(
       check = await checkTransaction({
         orderNsu,
         transactionNsu,
-        // O Pix precisa do invoice_slug; o Tap nao tem slug e passa null.
+        // O Pix precisa do invoice_slug para a conferencia resolver.
         slug: input.slug ?? intent.invoice_slug ?? null,
       });
 
@@ -284,30 +293,54 @@ export async function confirmIntent(
   }
 
   // ------------------------------------------- 7. confirmar e liberar -----
+  // Na recuperacao manual 'expired' tambem entra, porque e exatamente o estado
+  // do intent que o passo 3 deixou passar. 'paid' nunca entra em nenhum dos
+  // dois casos: um pedido ja liberado nao e liberado de novo.
+  return await releaseIntent(db, intent, {
+    statusLiberaveis: source === "recovery" ? ["pending", "expired"] : ["pending"],
+    intentFields: {
+      transaction_nsu: transactionNsu,
+      authorization_code: input.aut ? String(input.aut).slice(0, 50) : null,
+      card_brand: input.cardBrand ? String(input.cardBrand).slice(0, 30) : null,
+      merchant_handle: config.infinitepay.handle,
+    },
+    eventType: "payment_confirmed",
+    source,
+  });
+}
+
+/**
+ * Marca o intent como pago e libera o pedido (gera o token de download).
+ *
+ * Usado pelo Pix (confirmIntent) e pela liberacao do atendente. NAO valida
+ * nada sobre o pagamento -- quem chama ja precisa ter decidido que o dinheiro
+ * entrou. O que esta funcao garante e que a liberacao acontece uma vez so.
+ */
+export async function releaseIntent(
+  db: SupabaseClient,
+  intent: { id: string; order_id: string; amount_cents: number; payment_method: string },
+  opts: {
+    statusLiberaveis: string[];
+    intentFields: Record<string, unknown>;
+    eventType: "payment_confirmed" | "attendant_confirmed";
+    source: string;
+  },
+): Promise<ConfirmResult> {
   const downloadToken = generateDownloadToken();
   const downloadExpiresAt = new Date(Date.now() + DOWNLOAD_TTL_DAYS * 86_400_000);
 
   // O update e condicionado ao status anterior. Se o webhook e o polling
   // chegarem juntos, so um encontra o registro pendente -- o outro cai na
-  // idempotencia do passo 2. E a trava contra dupla liberacao.
-  //
-  // Na recuperacao manual 'expired' tambem entra, porque e exatamente o estado
-  // do intent que o passo 3 deixou passar. 'paid' nunca entra em nenhum dos
-  // dois casos: um pedido ja liberado nao e liberado de novo.
-  const statusLiberaveis = source === "recovery" ? ["pending", "expired"] : ["pending"];
-
+  // idempotencia. E a trava contra dupla liberacao.
   const { data: updatedIntent, error: updateError } = await db
     .from("payment_intents")
     .update({
+      ...opts.intentFields,
       status: "paid",
-      transaction_nsu: transactionNsu,
-      authorization_code: input.aut ? String(input.aut).slice(0, 50) : null,
-      card_brand: input.cardBrand ? String(input.cardBrand).slice(0, 30) : null,
-      merchant_handle: config.infinitepay.handle,
       confirmed_at: new Date().toISOString(),
     })
     .eq("id", intent.id)
-    .in("status", statusLiberaveis)
+    .in("status", opts.statusLiberaveis)
     .select()
     .maybeSingle();
 
@@ -352,8 +385,8 @@ export async function confirmIntent(
   }
 
   await logEvent(db, {
-    type: "payment_confirmed", intentId: intent.id, orderId: intent.order_id,
-    payload: { amountCents: intent.amount_cents, method: intent.payment_method, source },
+    type: opts.eventType, intentId: intent.id, orderId: intent.order_id,
+    payload: { amountCents: intent.amount_cents, method: intent.payment_method, source: opts.source },
   });
 
   return {
