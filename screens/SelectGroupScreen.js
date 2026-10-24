@@ -27,6 +27,24 @@ function getMiddlePhoto(photos) {
 const COLS = 3;
 const CARD_SIZE = (width - spacing.lg * 2 - spacing.sm * (COLS - 1)) / COLS;
 
+// Horarios: grade 3x2 ocupando ~53% da largura (o resto fica pro golfinho),
+// limitada pela altura para as duas linhas caberem abaixo do cabecalho.
+const SESSIONS_SHARE = 0.53;
+const SESSION_COLS = 3;
+const SESSION_GAP = spacing.md;
+const SESSIONS_AREA = (width - spacing.lg * 2) * SESSIONS_SHARE;
+const SESSION_MAX_H = (height - 140 - SESSION_GAP) / 2;
+const SESSION_CARD_W = Math.floor((SESSIONS_AREA - SESSION_GAP * (SESSION_COLS - 1)) / SESSION_COLS) - 1;
+const SESSION_CARD_H = Math.min(SESSION_CARD_W * 1.05, SESSION_MAX_H);
+const SESSIONS_GRID_H = SESSION_CARD_H * 2 + SESSION_GAP;
+
+// Golfinho: ocupa a coluna dele mantendo a proporcao da imagem (840x546),
+// sem passar da altura da grade de horarios.
+const DOLPHIN_RATIO = 840 / 546;
+const DOLPHIN_COL_W = (width - spacing.lg * 2) * (1 - SESSIONS_SHARE) - spacing.lg;
+const DOLPHIN_W = Math.min(DOLPHIN_COL_W, SESSIONS_GRID_H * DOLPHIN_RATIO);
+const DOLPHIN_H = DOLPHIN_W / DOLPHIN_RATIO;
+
 export default function SelectGroupScreen({ navigation }) {
   const [step, setStep] = useState('session');
   const [selectedSession, setSelectedSession] = useState(null);
@@ -249,23 +267,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'center', paddingHorizontal: spacing.lg, gap: 0,
   },
-  dolphinWrap: { alignItems: 'center', justifyContent: 'center', flex: 1 },
-  dolphinImage: { width: width * 0.46, height: height * 0.72 },
-  sessionsWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  dolphinWrap: { alignItems: 'center', justifyContent: 'center', flex: 1 - SESSIONS_SHARE },
+  dolphinImage: { width: DOLPHIN_W, height: DOLPHIN_H },
+  sessionsWrap: { flex: SESSIONS_SHARE, alignItems: 'center', justifyContent: 'center' },
   sessionsGrid: {
     flexDirection: 'row', flexWrap: 'wrap',
-    gap: spacing.lg, justifyContent: 'center',
+    gap: SESSION_GAP, justifyContent: 'center',
   },
   sessionCard: {
-    width: 160, borderRadius: radius.lg, overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(144,224,239,0.35)',
+    width: SESSION_CARD_W, height: SESSION_CARD_H,
+    borderRadius: radius.lg, overflow: 'hidden',
+    borderWidth: 2, borderColor: 'rgba(144,224,239,0.45)',
   },
   sessionCardInner: {
-    paddingVertical: spacing.xl + 8, alignItems: 'center',
-    gap: 6, minHeight: 110, justifyContent: 'center',
+    flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
   },
-  sessionTime: { fontSize: 38, fontWeight: '900', color: colors.white },
-  sessionHoras: { fontSize: 14, color: colors.accentLight },
+  sessionTime: { fontSize: Math.round(SESSION_CARD_W * 0.26), fontWeight: '900', color: colors.white },
+  sessionHoras: { fontSize: 20, fontWeight: '600', color: colors.accentLight },
   groupsOuter: { flex: 1, flexDirection: 'column' },
   groupInstruction: {
     fontSize: 15, color: colors.gold, fontWeight: '700',
