@@ -292,8 +292,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   headerTextos: { flex: 1 },
-  headerTitle: { fontSize: 20, fontWeight: '900', color: colors.white },
-  headerSub: { fontSize: 13, color: colors.accentLight, marginTop: 2 },
+  headerTitle: { fontSize: 24, fontWeight: '900', color: colors.white },
+  headerSub: { fontSize: 15, color: colors.accentLight, marginTop: 2 },
   voltarBtn: {
     paddingHorizontal: spacing.lg, paddingVertical: spacing.sm,
     borderRadius: radius.full, borderWidth: 1, borderColor: colors.cardBorder,

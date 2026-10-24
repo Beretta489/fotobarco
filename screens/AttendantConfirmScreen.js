@@ -96,7 +96,7 @@ export default function AttendantConfirmScreen({ route, navigation }) {
           <Text style={styles.backText}>← Voltar</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Área do atendente</Text>
-        <View style={{ width: 70 }} />
+        <View style={{ width: 90 }} />
       </View>
 
       <KeyboardAvoidingView
@@ -170,8 +170,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  backText: { color: colors.accentLight, fontSize: 15, fontWeight: '600' },
-  headerTitle: { fontSize: 16, fontWeight: '800', color: colors.white, letterSpacing: 1 },
+  backText: { color: colors.accentLight, fontSize: 20, fontWeight: '600' },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: colors.white, letterSpacing: 1 },
   content: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: spacing.xl, gap: spacing.lg,

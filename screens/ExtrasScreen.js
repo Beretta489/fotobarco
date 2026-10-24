@@ -110,7 +110,7 @@ export default function ExtrasScreen({ route, navigation }) {
             <Text style={styles.subtitle}>Toque no + para adicionar (opcional)</Text>
           </View>
         </View>
-        <View style={{ width: 70 }} />
+        <View style={{ width: 90 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -218,11 +218,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  backText: { color: colors.accentLight, fontSize: 17, fontWeight: '600' },
+  backText: { color: colors.accentLight, fontSize: 20, fontWeight: '600' },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, justifyContent: 'center' },
-  dolphin: { fontSize: 28 },
-  title: { fontSize: 18, fontWeight: '900', color: colors.white },
-  subtitle: { fontSize: 12, color: colors.gold, fontWeight: '700', marginTop: 2 },
+  dolphin: { fontSize: 32 },
+  title: { fontSize: 24, fontWeight: '900', color: colors.white },
+  subtitle: { fontSize: 15, color: colors.gold, fontWeight: '700', marginTop: 2 },
   content: { padding: spacing.lg, gap: spacing.xl },
   section: { gap: spacing.md },
   sectionLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 2, color: colors.gray400 },

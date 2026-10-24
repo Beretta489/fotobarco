@@ -115,7 +115,7 @@ export default function SelectGroupScreen({ navigation }) {
             <Text style={styles.backText}>← Voltar</Text>
           </TouchableOpacity>
           <Text style={styles.headerBrand}>⛵ Jangalancha Show</Text>
-          <View style={{ width: 70 }} />
+          <View style={{ width: 90 }} />
         </View>
 
         {loading ? (
@@ -229,8 +229,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
     flexShrink: 0,
   },
-  backText: { color: colors.accentLight, fontSize: 17, fontWeight: '600' },
-  headerBrand: { fontSize: 16, fontWeight: '800', color: colors.white, letterSpacing: 1 },
+  backText: { color: colors.accentLight, fontSize: 20, fontWeight: '600' },
+  headerBrand: { fontSize: 22, fontWeight: '800', color: colors.white, letterSpacing: 1 },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   loadingText: { color: colors.gold, fontSize: 16, fontWeight: '600' },
   emptyText: { color: colors.accentLight, fontSize: 16, textAlign: 'center', lineHeight: 26 },

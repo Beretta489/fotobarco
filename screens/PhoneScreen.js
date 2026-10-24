@@ -78,7 +78,7 @@ export default function PhoneScreen({ route, navigation }) {
           <Text style={styles.backText}>← Voltar</Text>
         </TouchableOpacity>
         <Text style={styles.headerBrand}>⛵ Jangalancha Show</Text>
-        <View style={{ width: 70 }} />
+        <View style={{ width: 90 }} />
       </View>
 
       <Animated.View style={[styles.content, { opacity: fadeIn }]}>
@@ -195,8 +195,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  backText: { color: colors.accentLight, fontSize: 17, fontWeight: '600' },
-  headerBrand: { fontSize: 16, fontWeight: '800', color: colors.white, letterSpacing: 1 },
+  backText: { color: colors.accentLight, fontSize: 20, fontWeight: '600' },
+  headerBrand: { fontSize: 22, fontWeight: '800', color: colors.white, letterSpacing: 1 },
   content: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: spacing.xl, gap: spacing.lg,

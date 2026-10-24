@@ -67,7 +67,7 @@ export default function PhotoGalleryScreen({ route, navigation }) {
               <Text style={styles.photoCount}>{photos.length} fotos do seu passeio</Text>
             </View>
           </View>
-          <View style={{ width: 70 }} />
+          <View style={{ width: 90 }} />
         </View>
 
         <View style={styles.instructionBar}>
@@ -205,11 +205,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  backText: { color: colors.accentLight, fontSize: 17, fontWeight: '600' },
+  backText: { color: colors.accentLight, fontSize: 20, fontWeight: '600' },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, justifyContent: 'center' },
-  dolphin: { fontSize: 28 },
-  sessionName: { fontSize: 18, fontWeight: '900', color: colors.white },
-  photoCount: { fontSize: 12, color: colors.gray400 },
+  dolphin: { fontSize: 32 },
+  sessionName: { fontSize: 24, fontWeight: '900', color: colors.white },
+  photoCount: { fontSize: 15, color: colors.gray400 },
   instructionBar: {
     paddingHorizontal: spacing.lg, paddingVertical: spacing.sm,
     backgroundColor: 'rgba(255,214,10,0.08)',

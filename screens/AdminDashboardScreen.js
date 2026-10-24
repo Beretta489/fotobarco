@@ -387,8 +387,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  headerTitle: { fontSize: 18, fontWeight: '900', color: colors.white },
-  headerSub: { fontSize: 13, color: colors.gray400 },
+  headerTitle: { fontSize: 24, fontWeight: '900', color: colors.white },
+  headerSub: { fontSize: 15, color: colors.gray400 },
   headerAcoes: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   pendentesBtn: {
     paddingHorizontal: spacing.md, paddingVertical: spacing.xs,

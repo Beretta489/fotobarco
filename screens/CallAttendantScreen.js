@@ -106,7 +106,7 @@ export default function CallAttendantScreen({ route, navigation }) {
           <Text style={styles.dolphin}>🐬</Text>
           <Text style={styles.title}>Pagamento</Text>
         </View>
-        <View style={{ width: 70 }} />
+        <View style={{ width: 90 }} />
       </View>
 
       <View style={styles.content}>
@@ -174,10 +174,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  backText: { color: colors.accentLight, fontSize: 15, fontWeight: '600' },
+  backText: { color: colors.accentLight, fontSize: 20, fontWeight: '600' },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'center' },
-  dolphin: { fontSize: 20 },
-  title: { fontSize: 18, fontWeight: '900', color: colors.white },
+  dolphin: { fontSize: 32 },
+  title: { fontSize: 24, fontWeight: '900', color: colors.white },
   content: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: spacing.xl, gap: spacing.lg,
