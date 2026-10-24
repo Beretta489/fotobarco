@@ -23,7 +23,9 @@ const Stack = createStackNavigator();
 export default function AppNavigator() {
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {/* cardStyle flex: 1 prende cada tela na altura da janela no navegador;
+          sem isso o stack deixa a pagina crescer e o body (overflow hidden) corta o rodape */}
+      <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { flex: 1 } }}>
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
         <Stack.Screen name="EnterCode" component={SelectGroupScreen} />
         <Stack.Screen name="PhotoGallery" component={PhotoGalleryScreen} />

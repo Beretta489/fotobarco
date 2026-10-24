@@ -4,6 +4,7 @@ import {
   Image, ActivityIndicator, StatusBar, Dimensions, Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { photosService } from '../services/photos';
 import { colors, spacing, radius } from '../utils/theme';
 
@@ -13,6 +14,7 @@ const PHOTO_SIZE = (width - spacing.lg * 2 - spacing.sm * (COLS - 1)) / COLS;
 
 export default function PhotoGalleryScreen({ route, navigation }) {
   const { session, group } = route.params;
+  const insets = useSafeAreaInsets();
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -119,7 +121,7 @@ export default function PhotoGalleryScreen({ route, navigation }) {
           </ScrollView>
         )}
 
-        <View style={styles.bottomBar}>
+        <View style={[styles.bottomBar, { paddingBottom: spacing.lg + insets.bottom }]}>
           <TouchableOpacity
             style={styles.ctaBtn}
             onPress={() => navigation.navigate('PackageSelect', { session, photos, group })}
@@ -238,7 +240,7 @@ const styles = StyleSheet.create({
   },
   zoomIcon: { fontSize: 12 },
   bottomBar: {
-    padding: spacing.lg, borderTopWidth: 1,
+    padding: spacing.lg, borderTopWidth: 1, flexShrink: 0,
     borderTopColor: 'rgba(255,255,255,0.08)', backgroundColor: '#003566',
   },
   ctaBtn: { borderRadius: radius.full, overflow: 'hidden' },
