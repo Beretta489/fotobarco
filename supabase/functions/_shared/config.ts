@@ -125,6 +125,24 @@ export const config = {
     failureWindowMinutes: Number(optional("ATTENDANT_FAILURE_WINDOW_MINUTES", "15")),
   },
 
+  whatsapp: {
+    // URL do Webhook do n8n que recebe o pedido pago e manda as fotos pelo
+    // BotConversa. Use a "Production URL" do no Webhook (nao a de teste).
+    //   supabase secrets set N8N_WEBHOOK_URL=https://seu-n8n/webhook/fotobarco
+    //
+    // Vazio = envio DESLIGADO: o pedido e liberado normalmente e fica com
+    // whatsapp_status 'skipped', pronto para reenviar pelo whatsapp-resend.
+    webhookUrl: optional("N8N_WEBHOOK_URL", ""),
+
+    // Vai no header X-FotoBarco-Secret. O fluxo do n8n confere e recusa o
+    // resto -- sem isso, quem descobrir a URL dispara mensagens em nome da
+    // empresa.
+    //   supabase secrets set N8N_WEBHOOK_SECRET=<texto aleatorio longo>
+    webhookSecret: optional("N8N_WEBHOOK_SECRET", ""),
+
+    timeoutMs: Number(optional("N8N_WEBHOOK_TIMEOUT_MS", "15000")),
+  },
+
   // Teto de tentativas de confirmacao por intent. Barra forca bruta em cima do
   // endpoint de confirmacao (tentar varios nsu ate acertar um valido).
   maxConfirmAttempts: Number(optional("PAYMENT_MAX_CONFIRM_ATTEMPTS", "10")),

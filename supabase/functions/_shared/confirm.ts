@@ -26,6 +26,7 @@ import { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import { config } from "./config.ts";
 import { generateDownloadToken, logEvent } from "./db.ts";
 import { checkTransaction } from "./infinitepay.ts";
+import { scheduleWhatsappDispatch } from "./whatsapp.ts";
 
 const DOWNLOAD_TTL_DAYS = 30;
 
@@ -388,6 +389,10 @@ export async function releaseIntent(
     type: opts.eventType, intentId: intent.id, orderId: intent.order_id,
     payload: { amountCents: intent.amount_cents, method: intent.payment_method, source: opts.source },
   });
+
+  // Fotos pelo WhatsApp. So aqui, na liberacao que GANHOU a corrida: as
+  // repeticoes (idempotencia, corrida perdida) saem antes e nao reenviam.
+  scheduleWhatsappDispatch(db, intent.order_id);
 
   return {
     status: "paid",

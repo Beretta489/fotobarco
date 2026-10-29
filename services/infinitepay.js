@@ -151,6 +151,16 @@ export const infinitePayService = {
   async recuperarPix({ orderNsu, transactionNsu }) {
     return callFunction('payment-recover', { orderNsu, transactionNsu });
   },
+
+  /**
+   * Manda de novo as fotos de um pedido pago para o WhatsApp do cliente.
+   *
+   * O envio normal sai sozinho do servidor quando o pagamento e confirmado;
+   * isto e so para quando ele falhou. Tambem exige admin logado.
+   */
+  async reenviarWhatsapp(orderId, { force = false } = {}) {
+    return callFunction('whatsapp-resend', { orderId, force }, { timeoutMs: 30000 });
+  },
 };
 
 /**

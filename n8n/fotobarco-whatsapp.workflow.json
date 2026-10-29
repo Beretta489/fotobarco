@@ -1,0 +1,91 @@
+{
+  "name": "FotoBarco - Enviar fotos pagas no WhatsApp (BotConversa)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "fotobarco-pedido-pago",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Pedido pago (Supabase)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "fotobarco-pedido-pago"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "c0000001-0000-4000-8000-000000000001",
+              "leftValue": "={{ $json.headers['x-fotobarco-secret'] }}",
+              "rightValue": "COLE_AQUI_O_N8N_WEBHOOK_SECRET",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Segredo confere?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, orderId: $json.body.orderId } }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "name": "Responde 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [440, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, error: 'NAO_AUTORIZADO' } }}",
+        "options": { "responseCode": 401 }
+      },
+      "id": "a1b2c3d4-0004-4000-8000-000000000004",
+      "name": "Responde 401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [440, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "// =====================================================================\n// Envia as fotos do pedido pelo BotConversa.\n// Entrada: o JSON que a Edge Function do FotoBarco manda (ver\n// supabase/functions/_shared/whatsapp.ts).\n// =====================================================================\n\n// >>> PREENCHER: BotConversa > Configuracoes > Integracoes > API (API-KEY)\nconst API_KEY = 'COLE_AQUI_A_API_KEY_DO_BOTCONVERSA';\n\nconst BASE = 'https://backend.botconversa.com.br/api/v1/webhook';\n// Pausa entre mensagens: rajada de muitas midias seguidas aumenta o risco\n// de o WhatsApp bloquear o numero.\nconst PAUSA_MS = 1500;\n\nconst pedido = $('Pedido pago (Supabase)').first().json.body;\nconst headers = { 'API-KEY': API_KEY, 'Content-Type': 'application/json' };\nconst sleep = (ms) => new Promise((r) => setTimeout(r, ms));\n\nconst http = (opts) => this.helpers.httpRequest({ json: true, headers, ...opts });\n\n// ------------------------------------------- 1. achar ou criar o contato --\nlet subscriber = null;\ntry {\n  subscriber = await http({ method: 'GET', url: `${BASE}/subscriber/get_by_phone/${pedido.phone}/` });\n} catch (e) {\n  // 404 = contato ainda nao existe no BotConversa.\n}\n\nif (!subscriber?.id) {\n  subscriber = await http({\n    method: 'POST',\n    url: `${BASE}/subscriber/`,\n    body: {\n      phone: `+${pedido.phone}`,\n      first_name: 'Cliente',\n      last_name: 'Jangalancha',\n      // O cliente digitou o proprio numero no tablet pedindo as fotos.\n      has_opt_in_whatsapp: true,\n    },\n  });\n}\n\nconst send = (type, value) => http({\n  method: 'POST',\n  url: `${BASE}/subscriber/${subscriber.id}/send_message/`,\n  body: { type, value },\n});\n\n// ------------------------------------------------------ 2. as mensagens --\nconst qtd = pedido.photoCount;\nawait send('text',\n  `Ola! 🐬 Obrigado por passear com a Jangalancha Show!\\n\\n` +\n  `Aqui estao suas ${qtd} foto${qtd === 1 ? '' : 's'}` +\n  (pedido.session ? ` do ${pedido.session}` : '') + '. 📸');\nawait sleep(PAUSA_MS);\n\nlet enviadas = 0;\nconst falhas = [];\nfor (const foto of pedido.photos) {\n  try {\n    await send('file', foto.url);\n    enviadas++;\n  } catch (e) {\n    falhas.push({ id: foto.id, erro: String(e.message || e).slice(0, 200) });\n  }\n  await sleep(PAUSA_MS);\n}\n\nawait send('text', 'Esperamos que tenha gostado! Volte sempre. 🌊');\n\nreturn [{ json: { orderId: pedido.orderId, subscriberId: subscriber.id, enviadas, falhas } }];\n"
+      },
+      "id": "a1b2c3d4-0005-4000-8000-000000000005",
+      "name": "Enviar fotos (BotConversa)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 200]
+    }
+  ],
+  "connections": {
+    "Pedido pago (Supabase)": {
+      "main": [[{ "node": "Segredo confere?", "type": "main", "index": 0 }]]
+    },
+    "Segredo confere?": {
+      "main": [
+        [{ "node": "Responde 200", "type": "main", "index": 0 }],
+        [{ "node": "Responde 401", "type": "main", "index": 0 }]
+      ]
+    },
+    "Responde 200": {
+      "main": [[{ "node": "Enviar fotos (BotConversa)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

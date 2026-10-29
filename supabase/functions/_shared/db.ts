@@ -74,7 +74,9 @@ export type EventType =
   | "replay_blocked"
   | "rate_limited"
   | "attendant_confirmed"
-  | "attendant_rejected";
+  | "attendant_rejected"
+  | "whatsapp_dispatched"
+  | "whatsapp_failed";
 
 /**
  * Grava um evento de auditoria.

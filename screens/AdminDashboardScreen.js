@@ -9,11 +9,21 @@ import { sessionsService } from '../services/sessions';
 import { photosService } from '../services/photos';
 import { ordersService } from '../services/orders';
 import { authService } from '../services/auth';
+import { infinitePayService } from '../services/infinitepay';
 import { colors, spacing, radius } from '../utils/theme';
 
 const HORARIOS = [
   '09:00', '10:15', '11:45', '13:30', '14:45', '16:00'
 ];
+
+// Estado do envio das fotos pelo WhatsApp (orders.whatsapp_status).
+const WHATSAPP_LABEL = {
+  sent: '📲 Fotos enviadas no WhatsApp',
+  sending: '⏳ Enviando no WhatsApp...',
+  failed: '⚠️ Falha no envio do WhatsApp',
+  skipped: '⚠️ WhatsApp não enviado',
+  none: '— WhatsApp não enviado',
+};
 
 export default function AdminDashboardScreen({ navigation }) {
   const [tab, setTab] = useState('dashboard');
@@ -24,6 +34,7 @@ export default function AdminDashboardScreen({ navigation }) {
 
   const [newGroupNames, setNewGroupNames] = useState({});
   const [expandedSession, setExpandedSession] = useState(null);
+  const [resendingId, setResendingId] = useState(null);
 
   const mounted = useRef(true);
   useEffect(() => {
@@ -120,6 +131,23 @@ export default function AdminDashboardScreen({ navigation }) {
       loadData();
     } finally {
       if (mounted.current) setUploading(false);
+    }
+  };
+
+  const handleResend = async (order) => {
+    setResendingId(order.id);
+    try {
+      // Pedido ja enviado so sai de novo com force -- evita mandar em dobro
+      // por um toque sem querer.
+      await infinitePayService.reenviarWhatsapp(order.id, {
+        force: order.whatsapp_status === 'sent',
+      });
+      Alert.alert('✅ Enviado', `Fotos reenviadas para ${order.client_phone}.`);
+    } catch (e) {
+      Alert.alert('Erro', `Não foi possível reenviar (${e.code || e.message}).`);
+    } finally {
+      if (mounted.current) setResendingId(null);
+      loadData();
     }
   };
 
@@ -221,8 +249,24 @@ export default function AdminDashboardScreen({ navigation }) {
                     </Text>
                     <Text style={styles.orderPhone}>{order.client_phone}</Text>
                     <Text style={styles.orderStatus}>✓ Pago</Text>
+                    <Text style={styles.orderWhatsapp}>
+                      {WHATSAPP_LABEL[order.whatsapp_status] ?? WHATSAPP_LABEL.none}
+                    </Text>
                   </View>
-                  <Text style={styles.orderTotal}>R$ {Number(order.total).toFixed(2)}</Text>
+                  <View style={styles.orderRight}>
+                    <Text style={styles.orderTotal}>R$ {Number(order.total).toFixed(2)}</Text>
+                    {order.whatsapp_status !== 'sending' && (
+                      <TouchableOpacity
+                        style={styles.resendBtn}
+                        disabled={resendingId === order.id}
+                        onPress={() => handleResend(order)}
+                      >
+                        {resendingId === order.id
+                          ? <ActivityIndicator size="small" color={colors.white} />
+                          : <Text style={styles.resendText}>Reenviar fotos</Text>}
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
               ))
             )}
@@ -439,6 +483,13 @@ const styles = StyleSheet.create({
   orderPhone: { fontSize: 13, color: colors.accentLight },
   orderStatus: { fontSize: 13, color: colors.success },
   orderTotal: { fontSize: 20, fontWeight: '900', color: colors.gold },
+  orderWhatsapp: { fontSize: 12, color: colors.gray400, marginTop: 2 },
+  orderRight: { alignItems: 'flex-end', gap: spacing.xs },
+  resendBtn: {
+    backgroundColor: colors.success, borderRadius: radius.sm,
+    paddingVertical: 6, paddingHorizontal: spacing.sm, minWidth: 110, alignItems: 'center',
+  },
+  resendText: { fontSize: 12, fontWeight: '700', color: colors.white },
   emptyText: {
     color: colors.gray400, fontSize: 15,
     textAlign: 'center', paddingVertical: spacing.xl,
