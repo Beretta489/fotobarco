@@ -13,7 +13,8 @@ if (!SUPABASE_URL) { console.error('❌ SUPABASE_URL não definida'); process.ex
 if (!SUPABASE_SERVICE_KEY) { console.error('❌ SUPABASE_SERVICE_ROLE_KEY não definida — o bot precisa da service role para operar'); process.exit(1); }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+const SOMENTE_LIMPEZA = process.argv.includes('--limpar');
+const bot = new TelegramBot(BOT_TOKEN, { polling: !SOMENTE_LIMPEZA });
 
 const GROUP_MAP = {
   '-1003981585031': { session: '09:00', family: 'Familia 1' },
@@ -188,7 +189,11 @@ async function uploadPhoto(sessionId, groupId, fileBuffer, fileName) {
   console.log(`✅ Foto salva: ${path}`);
 }
 
-bot.on('photo', async (msg) => {
+// Fila por chat: um album chega como varias mensagens quase simultaneas e,
+// processadas em paralelo, cada uma criava o seu proprio grupo (familia).
+const chatQueues = new Map();
+
+bot.on('photo', (msg) => {
   const chatId = String(msg.chat.id);
   const groupInfo = GROUP_MAP[chatId];
 
@@ -197,6 +202,15 @@ bot.on('photo', async (msg) => {
     return;
   }
 
+  const previous = chatQueues.get(chatId) || Promise.resolve();
+  const current = previous.then(() => processPhoto(msg, chatId, groupInfo));
+  chatQueues.set(chatId, current);
+  current.finally(() => {
+    if (chatQueues.get(chatId) === current) chatQueues.delete(chatId);
+  });
+});
+
+async function processPhoto(msg, chatId, groupInfo) {
   console.log(`📸 Foto recebida em ${groupInfo.session} - ${groupInfo.family}`);
 
   try {
@@ -215,7 +229,7 @@ bot.on('photo', async (msg) => {
   } catch (e) {
     console.error(`❌ Erro ao processar foto:`, e.message);
   }
-});
+}
 
 cron.schedule('30 8 * * *', async () => {
   console.log('🌅 Criando sessões do dia...');
@@ -229,7 +243,7 @@ cron.schedule('30 8 * * *', async () => {
   }
 }, { timezone: 'America/Fortaleza' });
 
-cron.schedule('0 23 * * *', async () => {
+async function dailyCleanup() {
   console.log('🧹 Limpando fotos do dia...');
   try {
     // Paginar para não limitar a 1000 registros
@@ -248,22 +262,48 @@ cron.schedule('0 23 * * *', async () => {
       from += PAGE_SIZE;
     }
 
+    // Pedidos apontam para grupos e fotos sem cascade: sem apagar antes, o
+    // delete de photos/groups falhava e so os arquivos sumiam. Apagar o pedido
+    // leva junto itens, extras e payment_intents (cascade).
+    const { error: ordersError, count: ordersCount } = await supabase
+      .from('orders')
+      .delete({ count: 'exact' })
+      .not('group_id', 'is', null);
+    if (ordersError) throw ordersError;
+
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .delete()
+      .not('photo_id', 'is', null);
+    if (itemsError) throw itemsError;
+
     if (allPaths.length > 0) {
       // Remover em lotes de 100 (limite do storage API)
       for (let i = 0; i < allPaths.length; i += 100) {
-        await supabase.storage.from('photos').remove(allPaths.slice(i, i + 100));
+        const { error } = await supabase.storage.from('photos').remove(allPaths.slice(i, i + 100));
+        if (error) throw error;
       }
     }
 
-    await supabase.from('photos').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await supabase.from('groups').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await supabase.from('sessions').update({ active: false }).eq('active', true);
+    const { error: photosError } = await supabase.from('photos').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (photosError) throw photosError;
+    const { error: groupsError } = await supabase.from('groups').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (groupsError) throw groupsError;
+    const { error: sessionsError } = await supabase.from('sessions').update({ active: false }).eq('active', true);
+    if (sessionsError) throw sessionsError;
 
-    console.log(`✅ Limpeza concluída! ${allPaths.length} arquivos removidos.`);
+    console.log(`✅ Limpeza concluída! ${allPaths.length} arquivos e ${ordersCount ?? 0} pedidos removidos.`);
   } catch (e) {
     console.error('❌ Erro na limpeza:', e.message);
   }
-}, { timezone: 'America/Fortaleza' });
+}
+
+cron.schedule('0 23 * * *', dailyCleanup, { timezone: 'America/Fortaleza' });
+
+// `node bot.js --limpar` roda a limpeza na hora e sai, sem ligar o bot.
+if (SOMENTE_LIMPEZA) {
+  dailyCleanup().then(() => process.exit(0));
+}
 
 console.log('🐬 FotoJanga Bot rodando...');
 console.log(`📱 ${Object.keys(GROUP_MAP).length} grupos monitorados`);
