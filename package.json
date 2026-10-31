@@ -15,6 +15,7 @@
     "@supabase/supabase-js": "^2.106.1",
     "dotenv": "^17.4.2",
     "expo": "~55.0.31",
+    "expo-clipboard": "~55.0.17",
     "expo-image-picker": "~55.0.24",
     "expo-linear-gradient": "~55.0.18",
     "expo-status-bar": "~55.0.6",

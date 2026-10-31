@@ -93,7 +93,9 @@ export default function PendingOrdersScreen({ navigation }) {
 
   const liberar = async (item) => {
     const limpo = nsu.trim();
-    if (!limpo) {
+    // Pix do Efi: o servidor consulta a cobranca direto, sem NSU.
+    const porCobranca = item.provider === 'efi';
+    if (!limpo && !porCobranca) {
       setResultado({ tipo: 'erro', texto: 'Digite o NSU do comprovante.' });
       return;
     }
@@ -104,7 +106,7 @@ export default function PendingOrdersScreen({ navigation }) {
     try {
       const r = await infinitePayService.recuperarPix({
         orderNsu: item.order_nsu,
-        transactionNsu: limpo,
+        transactionNsu: porCobranca ? undefined : limpo,
       });
 
       if (!montado.current) return;
@@ -117,7 +119,9 @@ export default function PendingOrdersScreen({ navigation }) {
         tipo: 'ok',
         texto: r.alreadyConfirmed
           ? 'Este pedido ja estava liberado. Link abaixo.'
-          : 'Pagamento confirmado na InfinitePay. Pedido liberado.',
+          : porCobranca
+            ? 'Pagamento confirmado no banco. Pedido liberado.'
+            : 'Pagamento confirmado na InfinitePay. Pedido liberado.',
         link,
       });
       setLiberados((m) => ({ ...m, [item.id]: link }));
@@ -226,19 +230,27 @@ export default function PendingOrdersScreen({ navigation }) {
 
               {aberto && !liberado && (
                 <View style={styles.painel}>
-                  <Text style={styles.painelLabel}>
-                    NSU DA TRANSACAO (no comprovante do cliente)
-                  </Text>
-                  <TextInput
-                    style={styles.input}
-                    value={nsu}
-                    onChangeText={(t) => { setNsu(t); setResultado(null); }}
-                    placeholder="cole ou digite o NSU"
-                    placeholderTextColor={colors.gray400}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    editable={!liberando}
-                  />
+                  {item.provider === 'efi' ? (
+                    <Text style={styles.painelLabel}>
+                      PIX EFI: NAO PRECISA DE NSU. O servidor consulta a cobranca no banco.
+                    </Text>
+                  ) : (
+                    <>
+                      <Text style={styles.painelLabel}>
+                        NSU DA TRANSACAO (no comprovante do cliente)
+                      </Text>
+                      <TextInput
+                        style={styles.input}
+                        value={nsu}
+                        onChangeText={(t) => { setNsu(t); setResultado(null); }}
+                        placeholder="cole ou digite o NSU"
+                        placeholderTextColor={colors.gray400}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        editable={!liberando}
+                      />
+                    </>
+                  )}
 
                   <TouchableOpacity
                     style={[styles.liberarBtn, liberando && styles.btnDesativado]}
@@ -264,8 +276,10 @@ export default function PendingOrdersScreen({ navigation }) {
                   )}
 
                   <Text style={styles.aviso}>
-                    O servidor confere a transacao na InfinitePay antes de liberar.
-                    Se o valor nao bater, o pedido nao sai.
+                    {item.provider === 'efi'
+                      ? 'O servidor confere o pagamento no banco antes de liberar.'
+                      : 'O servidor confere a transacao na InfinitePay antes de liberar.'}
+                    {' '}Se o valor nao bater, o pedido nao sai.
                   </Text>
                 </View>
               )}

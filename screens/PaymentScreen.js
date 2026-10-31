@@ -13,8 +13,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Clipboard, ActivityIndicator, StatusBar, Animated, ScrollView,
+  ActivityIndicator, StatusBar, Animated, ScrollView,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import QRCode from 'react-native-qrcode-svg';
 import { infinitePayService, mensagemDeErro } from '../services/infinitepay';
@@ -27,7 +28,7 @@ const PIX_POLL_MS = 3000;
 const FASE = {
   CRIANDO: 'criando',           // pedindo a cobranca ao servidor
   PIX_AGUARDANDO: 'pix',        // QR na tela, perguntando se caiu
-  CONFIRMANDO: 'confirmando',   // servidor conferindo com a InfinitePay
+  CONFIRMANDO: 'confirmando',   // servidor conferindo com o banco
   ERRO: 'erro',
 };
 
@@ -152,8 +153,9 @@ export default function PaymentScreen({ route, navigation }) {
   useEffect(() => { abrirCobranca(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ------------------------------------------------------------- 2a. PIX ----
-  // Quem confirma o Pix e o webhook da InfinitePay; este polling so le o
-  // resultado que o webhook ja gravou no banco.
+  // Quem confirma o Pix e o servidor: pelo webhook do provedor e, no Efi,
+  // tambem consultando a cobranca quando este polling pergunta. A tela so
+  // mostra o resultado.
   const iniciarPollingPix = useCallback((orderNsu) => {
     if (pollRef.current) clearInterval(pollRef.current);
 
@@ -190,11 +192,20 @@ export default function PaymentScreen({ route, navigation }) {
     }
   }, [intent, concluir, falhar]);
 
-  const copiarLink = () => {
-    if (!intent?.checkoutUrl) return;
-    Clipboard.setString(intent.checkoutUrl);
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 2500);
+  // Efi devolve o BR Code (Pix copia e cola); a InfinitePay, um link. O QR
+  // Code e o botao de copiar usam o que vier.
+  const pixCodigo = intent?.pixCopiaECola || intent?.checkoutUrl || null;
+  const ehCopiaECola = Boolean(intent?.pixCopiaECola);
+
+  const copiarCodigo = async () => {
+    if (!pixCodigo) return;
+    try {
+      await Clipboard.setStringAsync(pixCodigo);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    } catch (_) {
+      // Sem permissao de area de transferencia (web): o QR continua valendo.
+    }
   };
 
   // ------------------------------------------------------------------ render --
@@ -259,16 +270,18 @@ export default function PaymentScreen({ route, navigation }) {
         )}
 
         {/* -------------------------------------------------------- PIX ---- */}
-        {fase === FASE.PIX_AGUARDANDO && intent?.checkoutUrl && (
+        {fase === FASE.PIX_AGUARDANDO && pixCodigo && (
           <>
             <Text style={styles.instruction}>
-              Peça para o cliente escanear com a câmera do celular:
+              {ehCopiaECola
+                ? 'Peça para o cliente escanear com o app do banco (Pix > Ler QR Code):'
+                : 'Peça para o cliente escanear com a câmera do celular:'}
             </Text>
 
             <Animated.View style={[styles.qrWrapper, { transform: [{ scale: pulse }] }]}>
               <View style={styles.qrInner}>
                 <QRCode
-                  value={intent.checkoutUrl}
+                  value={pixCodigo}
                   size={200}
                   color="#003566"
                   backgroundColor="#FFFFFF"
@@ -283,9 +296,11 @@ export default function PaymentScreen({ route, navigation }) {
               </Text>
             </View>
 
-            <TouchableOpacity style={styles.copyBtn} onPress={copiarLink}>
+            <TouchableOpacity style={styles.copyBtn} onPress={copiarCodigo}>
               <Text style={styles.copyText}>
-                {copiado ? '✓ Link copiado!' : '📋 Copiar link de pagamento'}
+                {ehCopiaECola
+                  ? (copiado ? '✓ Pix copiado!' : '📋 Copiar Pix copia e cola')
+                  : (copiado ? '✓ Link copiado!' : '📋 Copiar link de pagamento')}
               </Text>
             </TouchableOpacity>
 
@@ -301,7 +316,7 @@ export default function PaymentScreen({ route, navigation }) {
           <View style={styles.box}>
             <ActivityIndicator color={colors.success} size="large" />
             <Text style={styles.boxTitle}>Confirmando pagamento...</Text>
-            <Text style={styles.boxText}>Conferindo com a InfinitePay. Não feche o app.</Text>
+            <Text style={styles.boxText}>{intent?.provider === 'efi' ? 'Conferindo com o banco.' : 'Conferindo com a InfinitePay.'} Não feche o app.</Text>
           </View>
         )}
 

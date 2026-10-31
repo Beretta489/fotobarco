@@ -29,7 +29,7 @@ export const pendingPaymentsService = {
     const { data, error } = await supabase
       .from('payment_intents')
       .select(`
-        id, order_nsu, amount_cents, status, invoice_slug,
+        id, order_nsu, amount_cents, status, invoice_slug, provider,
         expires_at, created_at,
         orders ( id, client_phone, status )
       `)

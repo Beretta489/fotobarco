@@ -70,6 +70,9 @@ async function callFunction(name, payload, { timeoutMs = 20000 } = {}) {
   return data;
 }
 
+// O nome ficou por compatibilidade: o servico agora fala com qualquer provedor
+// Pix configurado no servidor (Efi ou InfinitePay, secret PIX_PROVIDER). O app
+// nao sabe -- nem precisa saber -- qual e.
 export const infinitePayService = {
   /**
    * Abre uma cobranca e devolve o que a tela precisa.
@@ -181,7 +184,7 @@ export function mensagemDeErro(code) {
     PAGAMENTO_ENCERRADO:
       'Este pagamento ja foi encerrado. Refaca o pedido.',
     PROVEDOR_INDISPONIVEL:
-      'A InfinitePay nao respondeu. Aguarde e tente confirmar novamente.',
+      'O banco nao respondeu. Aguarde e tente confirmar novamente.',
     VALOR_DIVERGENTE:
       'O valor pago nao confere com o pedido. Chame o responsavel.',
     TRANSACAO_JA_UTILIZADA:
