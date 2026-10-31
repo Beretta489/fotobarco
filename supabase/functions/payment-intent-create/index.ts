@@ -14,7 +14,10 @@
 //     "paymentMethod": "pix" | "credit" | "debit" | "cash"
 //   }
 //
-// Saida (pix):        { ok, intentId, orderId, orderNsu, amountCents, checkoutUrl }
+// Saida (pix):        { ok, intentId, orderId, orderNsu, amountCents, expiresAt,
+//                       provider, pixCopiaECola, checkoutUrl }
+//   pixCopiaECola = BR Code (Efi). checkoutUrl = link (InfinitePay) ou, no
+//   Efi, o mesmo copia e cola -- compatibilidade com o app antigo.
 // Saida (atendente):  { ok, intentId, orderId, orderNsu, amountCents }
 //   credit/debit/cash nao tem cobranca integrada: o atendente recebe fora do
 //   app e libera com a senha em payment-attendant-confirm.
@@ -24,7 +27,7 @@
 
 import { config, corsHeaders, errorResponse, json } from "../_shared/config.ts";
 import { generateOrderNsu, logEvent, serviceClient } from "../_shared/db.ts";
-import { createCheckoutLink } from "../_shared/infinitepay.ts";
+import { type CreatedCharge, providerForNewCharge } from "../_shared/pix/index.ts";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-9a-f][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -172,28 +175,30 @@ Deno.serve(async (req) => {
       : config.attendant.intentTtlMinutes;
     const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
 
-    // --- Pix: cria o link de checkout ANTES de gravar o intent -------------
-    // Se a InfinitePay recusar, nao queremos um intent orfao apontando para uma
-    // cobranca que nunca existiu.
-    let checkoutUrl: string | null = null;
-    let invoiceSlug: string | null = null;
+    // --- Pix: cria a cobranca no provedor ANTES de gravar o intent ---------
+    // Se o provedor recusar, nao queremos um intent orfao apontando para uma
+    // cobranca que nunca existiu. O provedor (Efi ou InfinitePay) e escolhido
+    // pelo secret PIX_PROVIDER -- ver _shared/pix/index.ts.
+    //
+    // O txid da cobranca e o proprio orderNsu: assim webhook, polling e
+    // recuperacao continuam localizando o pedido pela mesma chave de sempre.
+    let charge: CreatedCharge | null = null;
 
     if (paymentMethod === "pix") {
       try {
-        const link = await createCheckoutLink({
-          orderNsu,
+        charge = await providerForNewCharge().createCharge({
+          txid: orderNsu,
           amountCents,
+          expiresInSeconds: ttlMinutes * 60,
           description: `Fotos Jangalancha Show - pedido ${orderNsu.slice(-8)}`,
           clientPhone,
         });
-        checkoutUrl = link.url;
-        invoiceSlug = link.slug;
       } catch (e) {
-        console.error("[intent] falha ao criar link de checkout", e);
+        console.error("[intent] falha ao criar cobranca Pix", e);
         await logEvent(db, {
           type: "payment_failed",
           orderId: order.id,
-          payload: { stage: "checkout_link", detail: String(e).slice(0, 300) },
+          payload: { stage: "pix_charge", detail: String(e).slice(0, 300) },
         });
         return errorResponse("FALHA_AO_GERAR_PIX", 502);
       }
@@ -209,8 +214,13 @@ Deno.serve(async (req) => {
         installments,
         status: "pending",
         expires_at: expiresAt.toISOString(),
-        checkout_url: checkoutUrl,
-        invoice_slug: invoiceSlug,
+        checkout_url: charge?.checkoutUrl ?? null,
+        invoice_slug: charge?.invoiceSlug ?? null,
+        provider: charge?.provider ?? null,
+        provider_env: charge?.env ?? null,
+        provider_loc_id: charge?.locId ?? null,
+        provider_status: charge?.providerStatus ?? null,
+        pix_copia_e_cola: charge?.copiaECola ?? null,
       })
       .select()
       .single();
@@ -240,9 +250,18 @@ Deno.serve(async (req) => {
       paymentMethod,
     };
 
-    if (paymentMethod === "pix") {
-      // O tablet vira este URL em QR Code; o cliente escaneia com o celular.
-      return json({ ...base, checkoutUrl });
+    if (paymentMethod === "pix" && charge) {
+      // O tablet transforma isto em QR Code; o cliente escaneia com o celular.
+      //
+      // 'checkoutUrl' continua existindo para o APK antigo: no Efi ele recebe
+      // o proprio copia e cola, que tambem e um QR Code valido para o app do
+      // banco. A versao nova le 'pixCopiaECola'.
+      return json({
+        ...base,
+        provider: charge.provider,
+        pixCopiaECola: charge.copiaECola,
+        checkoutUrl: charge.checkoutUrl ?? charge.copiaECola,
+      });
     }
 
     // Credito, debito e dinheiro: nada a cobrar daqui. O tablet mostra o

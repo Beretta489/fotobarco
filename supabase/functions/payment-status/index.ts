@@ -14,6 +14,10 @@
 // │                                                                            │
 // │ Consequencia: se o webhook nao chegar, o Pix fica pendente mesmo tendo     │
 // │ sido pago. Por isso existe o modo de recuperacao abaixo.                   │
+// │                                                                            │
+// │ EFI: essa limitacao NAO existe. O txid e conhecido desde a criacao, entao  │
+// │ este endpoint tambem consulta a cobranca no Efi (com freio de frequencia)  │
+// │ e confirma por la -- e a reserva do webhook.                               │
 // └────────────────────────────────────────────────────────────────────────────┘
 //
 // Entrada: { orderNsu }
@@ -32,8 +36,34 @@
 // └───────────────────────────────────────────────────────────────────────────┘
 // =============================================================================
 
-import { corsHeaders, errorResponse, json } from "../_shared/config.ts";
+import { config, corsHeaders, errorResponse, json } from "../_shared/config.ts";
 import { serviceClient } from "../_shared/db.ts";
+import { confirmIntent } from "../_shared/confirm.ts";
+import { providerForIntent } from "../_shared/pix/index.ts";
+import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
+
+/**
+ * Reserva o direito de consultar o provedor agora. Update condicionado: dois
+ * tablets (ou duas abas) perguntando juntos -> so um consulta.
+ */
+async function reservarConsulta(db: SupabaseClient, intentId: string): Promise<boolean> {
+  const agora = new Date();
+  const limite = new Date(agora.getTime() - config.pix.pollMinIntervalSeconds * 1000).toISOString();
+
+  const { data, error } = await db
+    .from("payment_intents")
+    .update({ last_provider_check_at: agora.toISOString() })
+    .eq("id", intentId)
+    .or(`last_provider_check_at.is.null,last_provider_check_at.lt."${limite}"`)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("[status] falha ao reservar consulta", error);
+    return false;
+  }
+  return Boolean(data);
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -55,7 +85,7 @@ Deno.serve(async (req) => {
     // ------------------------------- consulta simples (polling normal) ------
     const { data: intent, error } = await db
       .from("payment_intents")
-      .select("id, order_id, status, expires_at")
+      .select("id, order_id, status, expires_at, payment_method, provider, provider_env")
       .eq("order_nsu", orderNsu)
       .maybeSingle();
 
@@ -64,6 +94,39 @@ Deno.serve(async (req) => {
       return errorResponse("ERRO_INTERNO", 500);
     }
     if (!intent) return errorResponse("PAGAMENTO_NAO_ENCONTRADO", 404);
+
+    // ------------------------- reserva: consultar a cobranca no provedor ----
+    // Provedores que consultam por txid (Efi) permitem conferir o Pix mesmo
+    // que o webhook nao chegue. Isto NAO reabre o furo descrito acima: a
+    // entrada continua sendo so o orderNsu (128 bits aleatorios), e quem
+    // decide e o GET /v2/cob/:txid -- nao ha nada para o chamador adivinhar.
+    //
+    // Freio: no maximo uma consulta ao provedor a cada
+    // EFI_POLL_MIN_INTERVAL_SECONDS por intent, reservada de forma atomica.
+    // Fora da janela, cai na leitura simples abaixo.
+    if (
+      intent.payment_method === "pix"
+      && ["pending", "expired"].includes(intent.status)
+      && providerForIntent(intent).checkCharge
+      && await reservarConsulta(db, intent.id)
+    ) {
+      const r = await confirmIntent(db, { orderNsu, source: "polling" });
+
+      if (r.status === "paid") {
+        return json({
+          ok: true,
+          status: "paid",
+          orderId: r.orderId,
+          downloadToken: r.downloadToken ?? null,
+          downloadExpiresAt: r.downloadExpiresAt ?? null,
+        });
+      }
+      if (r.status === "expired" || r.status === "failed") {
+        return json({ ok: false, status: r.status, error: r.code, orderId: intent.order_id }, 200);
+      }
+      // pending / provedor fora do ar: o tablet segue esperando.
+      return json({ ok: false, status: "pending", orderId: intent.order_id }, 200);
+    }
 
     if (intent.status === "paid") {
       const { data: order } = await db

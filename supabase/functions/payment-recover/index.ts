@@ -25,13 +25,18 @@
 //   poder de ignorar a expiracao seria entregar esse poder a qualquer pessoa
 //   que baixe o app. Esta function exige um usuario REALMENTE logado no painel.
 //
-// Entrada: { orderNsu, transactionNsu }
+// EFI: aqui nao precisa de NSU. O txid da cobranca e o proprio orderNsu, entao
+// o servidor consulta GET /v2/cob/:txid e libera se estiver CONCLUIDA com o
+// valor certo -- mesmas regras de confirmByCharge(), mesma janela de dias.
+//
+// Entrada: { orderNsu, transactionNsu }   (transactionNsu opcional no Efi)
 // Saida:   { ok, status, error?, orderId, downloadToken?, downloadExpiresAt? }
 // =============================================================================
 
 import { config, corsHeaders, errorResponse, json } from "../_shared/config.ts";
 import { serviceClient } from "../_shared/db.ts";
 import { confirmIntent } from "../_shared/confirm.ts";
+import { providerForIntent } from "../_shared/pix/index.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -74,7 +79,24 @@ Deno.serve(async (req) => {
     if (!orderNsu) return errorResponse("ORDER_NSU_AUSENTE");
 
     const transactionNsu = String(body.transactionNsu ?? "").trim();
-    if (!transactionNsu) return errorResponse("NSU_AUSENTE");
+
+    // Efi: o servidor consulta a cobranca pelo txid (= orderNsu) e descobre
+    // sozinho se foi paga -- o NSU digitado nao e necessario nem usado.
+    // InfinitePay: o payment_check exige o NSU do comprovante.
+    const { data: alvo, error: alvoError } = await db
+      .from("payment_intents")
+      .select("provider, provider_env")
+      .eq("order_nsu", orderNsu)
+      .maybeSingle();
+
+    // Sem isto, um erro de banco viraria "digite o NSU" num Pix do Efi.
+    if (alvoError) {
+      console.error("[recover] falha ao consultar intent", alvoError);
+      return errorResponse("ERRO_INTERNO", 500);
+    }
+
+    const consultaPorCobranca = Boolean(alvo && providerForIntent(alvo).checkCharge);
+    if (!consultaPorCobranca && !transactionNsu) return errorResponse("NSU_AUSENTE");
 
     // ------------------------------------------- 3. mesma porta de sempre ---
     const result = await confirmIntent(db, {
