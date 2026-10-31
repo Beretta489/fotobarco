@@ -76,6 +76,36 @@ export const config = {
       optional("INFINITEPAY_REQUIRE_PROVIDER_CHECK", "true") === "true",
   },
 
+  pix: {
+    // Quem gera as cobrancas Pix NOVAS: "efi" ou "infinitepay".
+    // Padrao "infinitepay" para o deploy nao mudar nada sozinho: a virada para
+    // o Efi e um `supabase secrets set PIX_PROVIDER=efi`, e voltar e o mesmo
+    // comando com "infinitepay". Ver EFI_SETUP.md.
+    provider: optional("PIX_PROVIDER", "infinitepay").toLowerCase(),
+
+    // Ambiente do Efi: "homologacao" ou "producao". Cada um tem seus proprios
+    // secrets (EFI_HOMOLOG_* / EFI_PROD_*) -- ver _shared/pix/efi.ts.
+    // Padrao homologacao: esquecer este secret gera Pix de teste (que nenhum
+    // banco real aceita), nunca cobranca de verdade na conta errada.
+    efiEnv: optional("EFI_ENV", "homologacao").toLowerCase(),
+
+    // Intervalo minimo entre duas consultas ao Efi para o MESMO intent vindas
+    // do polling do tablet. O tablet pergunta a cada 3 s; sem este freio cada
+    // tablet aberto viraria uma consulta ao banco a cada 3 s.
+    // Valor invalido (texto, negativo) cai no padrao: NaN aqui viraria uma
+    // data invalida e derrubaria o payment-status inteiro.
+    pollMinIntervalSeconds: (() => {
+      const n = Number(optional("EFI_POLL_MIN_INTERVAL_SECONDS", "10"));
+      return Number.isFinite(n) && n >= 1 ? n : 10;
+    })(),
+
+    // OPCIONAL. IPs de origem aceitos no webhook do Efi, separados por virgula
+    // (o Efi documenta 34.193.116.226). Vazio = nao confere IP. E so uma
+    // camada extra: a protecao real e o segredo na URL + consulta da cobranca.
+    efiWebhookAllowedIps: optional("EFI_WEBHOOK_ALLOWED_IPS", "")
+      .split(",").map((s) => s.trim()).filter(Boolean),
+  },
+
   app: {
     // Scheme do app, usado no redirect_url do Checkout Pix. Precisa bater com
     // o "scheme" declarado em app.config.js.
