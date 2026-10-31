@@ -170,8 +170,14 @@ Depois, para a homologação:
 npx supabase secrets set PIX_PROVIDER=efi EFI_ENV=homologacao --project-ref vofpisizzubbhpidgvoz
 ```
 
-(ou os mesmos dois pelo painel). Avise o Claude quando terminar; ele confere
-os **nomes** cadastrados (nunca os valores) antes do deploy.
+(ou os mesmos dois pelo painel). Confira os **nomes** cadastrados — o comando
+mostra só nome e hash, nunca o valor:
+
+```bash
+npx supabase secrets list --project-ref vofpisizzubbhpidgvoz
+```
+
+Depois avise o Claude para seguir com a seção 5.
 
 ---
 
