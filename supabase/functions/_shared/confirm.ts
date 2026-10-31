@@ -1,6 +1,10 @@
 // =============================================================================
 // CONFIRMACAO DE PAGAMENTO -- o coracao da seguranca do sistema
 // =============================================================================
+// Pix do Efi (provider 'efi'): ver confirmByCharge() -- a prova e a consulta
+// GET /v2/cob/:txid, e as tres entradas abaixo so dizem QUAL cobranca olhar.
+// O texto a seguir descreve o fluxo legado da InfinitePay.
+//
 // Tres caminhos diferentes podem dizer "esse Pix foi pago":
 //
 //   1. payment-webhook  -- a InfinitePay, quando o Pix cai
@@ -26,6 +30,7 @@ import { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import { config } from "./config.ts";
 import { generateDownloadToken, logEvent } from "./db.ts";
 import { checkTransaction } from "./infinitepay.ts";
+import { providerForIntent, type PixProvider, type PixProviderName } from "./pix/index.ts";
 import { scheduleWhatsappDispatch } from "./whatsapp.ts";
 
 const DOWNLOAD_TTL_DAYS = 30;
@@ -49,6 +54,11 @@ export interface ConfirmInput {
   /** Dados opcionais do cartao, para o comprovante. */
   aut?: string | null;
   cardBrand?: string | null;
+  /**
+   * Se informado, so intents destes provedores sao processados; os outros
+   * respondem not_found. Usado pelos webhooks: cada um so toca o seu.
+   */
+  allowedProviders?: PixProviderName[];
 }
 
 export interface ConfirmResult {
@@ -113,6 +123,23 @@ export async function confirmIntent(
       downloadToken: order?.download_token ?? null,
       downloadExpiresAt: order?.download_expires_at ?? null,
     };
+  }
+
+  // ------------------------------------------- provedor que consulta por txid --
+  // Efi (e qualquer provedor futuro que implemente checkCharge): a prova de
+  // pagamento e a propria cobranca no provedor, consultada pelo txid. O fluxo
+  // legado abaixo continua valendo so para os intents da InfinitePay.
+  const provider = providerForIntent(intent);
+
+  // Cada webhook so mexe nos pedidos do SEU provedor. Sem isto, o webhook
+  // publico da InfinitePay poderia disparar consultas ao Efi, e o do Efi
+  // poderia cair no fluxo legado de um intent da InfinitePay.
+  if (input.allowedProviders && !input.allowedProviders.includes(provider.name)) {
+    return { status: "not_found", httpStatus: 404, code: "PAGAMENTO_NAO_ENCONTRADO" };
+  }
+
+  if (provider.checkCharge) {
+    return await confirmByCharge(db, intent, provider, source);
   }
 
   // 'expired' nao e estado terminal para a RECUPERACAO MANUAL: o Pix pode ter
@@ -310,6 +337,162 @@ export async function confirmIntent(
   });
 }
 
+// =============================================================================
+// CONFIRMACAO POR CONSULTA DA COBRANCA (Efi)
+// =============================================================================
+// Webhook, polling e recuperacao manual chegam aqui com o mesmo pedido:
+// "confira o txid X". Nenhum deles traz prova -- quem diz se foi pago e o
+// GET /v2/cob/:txid. O corpo do webhook e o NSU digitado no painel sao
+// ignorados para decidir pagamento.
+//
+// Diferencas para o fluxo legado, todas porque aqui o provedor e a fonte da
+// verdade e o txid existe antes do pagamento:
+//
+//   - 'expired' nao bloqueia: se o Efi diz CONCLUIDA com o valor certo, o
+//     dinheiro entrou (o aviso so chegou depois do nosso prazo) e as fotos
+//     saem. O limite continua sendo recoveryWindowDays.
+//   - "ainda nao pago" nunca queima o intent: um webhook forjado ou adiantado
+//     nao pode condenar um pedido que o cliente ainda vai pagar.
+//   - Recuperacao manual nao precisa de NSU.
+// =============================================================================
+
+async function confirmByCharge(
+  db: SupabaseClient,
+  // deno-lint-ignore no-explicit-any
+  intent: any,
+  provider: PixProvider,
+  source: ConfirmInput["source"],
+): Promise<ConfirmResult> {
+  const base = { orderId: intent.order_id };
+
+  // 'failed' = alguma validacao ja recusou esta cobranca (valor divergente,
+  // replay, cobranca removida). Reabrir anularia a recusa.
+  if (["failed", "canceled"].includes(intent.status)) {
+    return { ...base, status: intent.status, httpStatus: 409, code: "PAGAMENTO_ENCERRADO" };
+  }
+
+  const limite = new Date(intent.created_at).getTime() + config.recoveryWindowDays * 86_400_000;
+  if (Date.now() > limite) {
+    return { ...base, status: "expired", httpStatus: 409, code: "PAGAMENTO_EXPIRADO" };
+  }
+
+  // Teto de tentativas so para a recuperacao manual. Aqui nao ha NSU para
+  // adivinhar (a entrada e so o txid), entao o teto servia apenas para nao
+  // martelar o Efi -- e aplica-lo ao webhook deixaria quem conhece um txid
+  // esgotar as tentativas e fazer o Efi parar de avisar. O webhook ja e
+  // autenticado pelo segredo da URL; o polling e freado por
+  // pollMinIntervalSeconds em payment-status.
+  if (source === "recovery") {
+    if (intent.confirm_attempts >= config.maxConfirmAttempts) {
+      await logEvent(db, {
+        type: "rate_limited", intentId: intent.id, orderId: intent.order_id,
+        payload: { attempts: intent.confirm_attempts, source },
+      });
+      return { ...base, status: "pending", httpStatus: 429, code: "TENTATIVAS_EXCEDIDAS" };
+    }
+    await db.from("payment_intents")
+      .update({ confirm_attempts: intent.confirm_attempts + 1 })
+      .eq("id", intent.id);
+  }
+
+  // ------------------------------------------------- consulta ao provedor --
+  let check;
+  try {
+    check = await provider.checkCharge!(intent.order_nsu);
+  } catch (e) {
+    // Provedor fora do ar NAO vira recusa: o cliente pode ter pago.
+    console.error("[confirm] provedor indisponivel", e);
+    await logEvent(db, {
+      type: "payment_failed", intentId: intent.id, orderId: intent.order_id,
+      payload: { reason: "provider_unreachable", provider: provider.name, detail: String(e).slice(0, 300), source },
+    });
+    return { ...base, status: "pending", httpStatus: 503, code: "PROVEDOR_INDISPONIVEL", retry: true };
+  }
+
+  // O polling consulta a cada ~10 s; auditar cada "ainda ATIVA" geraria
+  // dezenas de linhas por pedido. Do polling, so fica registrado o que muda.
+  const statusMudou = Boolean(check.providerStatus) && check.providerStatus !== intent.provider_status;
+  if (source !== "polling" || check.paid || statusMudou) {
+    await logEvent(db, {
+      type: "provider_checked", intentId: intent.id, orderId: intent.order_id,
+      payload: { ...check.audit, paid: check.paid, source },
+    });
+  }
+
+  if (statusMudou && check.providerStatus) {
+    await db.from("payment_intents")
+      .update({ provider_status: check.providerStatus.slice(0, 50) })
+      .eq("id", intent.id);
+  }
+
+  // ------------------------------------------------------- nao foi pago ----
+  if (!check.paid) {
+    if (check.final) {
+      await failIntent(db, intent, `cobranca_encerrada_no_provedor: ${check.providerStatus}`, source);
+      return { ...base, status: "failed", httpStatus: 409, code: "PAGAMENTO_ENCERRADO" };
+    }
+    if (source === "recovery") {
+      return { ...base, status: "failed", httpStatus: 402, code: "PAGAMENTO_NAO_CONFIRMADO" };
+    }
+    if (new Date(intent.expires_at).getTime() < Date.now()) {
+      await db.from("payment_intents")
+        .update({ status: "expired", failure_reason: "expirado_sem_pagamento" })
+        .eq("id", intent.id)
+        .eq("status", "pending");
+      return { ...base, status: "expired", httpStatus: 409, code: "PAGAMENTO_EXPIRADO" };
+    }
+    return { ...base, status: "pending", httpStatus: 200, code: "AGUARDANDO_PAGAMENTO" };
+  }
+
+  // ---------------------------------------------------------- valor ------
+  // A cobranca foi criada por nos com o valor do servidor; divergir aqui
+  // significa algo muito errado (ou alguem mexendo na cobranca no painel).
+  const valorOk = check.amountCents === intent.amount_cents
+    && (check.paidAmountCents === null || check.paidAmountCents >= intent.amount_cents);
+
+  if (!valorOk) {
+    await logEvent(db, {
+      type: "amount_mismatch", intentId: intent.id, orderId: intent.order_id,
+      payload: { esperado: intent.amount_cents, cobranca: check.amountCents, pago: check.paidAmountCents, source },
+    });
+    await failIntent(db, intent, `valor_divergente: esperado ${intent.amount_cents}, cobranca ${check.amountCents}, pago ${check.paidAmountCents}`, source);
+    return { ...base, status: "failed", httpStatus: 409, code: "VALOR_DIVERGENTE" };
+  }
+
+  // -------------------------------------------------------- anti-replay --
+  // Um endToEndId quita um unico pedido (unique em transaction_nsu).
+  const paymentId = check.paymentId!;
+  const { data: jaUsada } = await db
+    .from("payment_intents")
+    .select("id")
+    .eq("transaction_nsu", paymentId)
+    .neq("id", intent.id)
+    .maybeSingle();
+
+  if (jaUsada) {
+    await logEvent(db, {
+      type: "replay_blocked", intentId: intent.id, orderId: intent.order_id,
+      payload: { paymentId, usadaEm: jaUsada.id, source },
+    });
+    await failIntent(db, intent, "pagamento_ja_utilizado_em_outro_pedido", source);
+    return { ...base, status: "failed", httpStatus: 409, code: "TRANSACAO_JA_UTILIZADA" };
+  }
+
+  // ------------------------------------------------- confirmar e liberar --
+  // Idempotente: releaseIntent so atualiza se o status ainda for
+  // pending/expired. Webhook + polling + reenvio do Efi chegando juntos ->
+  // um libera, os outros recebem "ja pago" com o mesmo token.
+  return await releaseIntent(db, intent, {
+    statusLiberaveis: ["pending", "expired"],
+    intentFields: {
+      transaction_nsu: paymentId,
+      provider_status: check.providerStatus?.slice(0, 50) ?? null,
+    },
+    eventType: "payment_confirmed",
+    source,
+  });
+}
+
 /**
  * Marca o intent como pago e libera o pedido (gera o token de download).
  *
@@ -346,8 +529,26 @@ export async function releaseIntent(
     .maybeSingle();
 
   if (updateError || !updatedIntent) {
+    // So e "corrida perdida" se o intent estiver MESMO pago agora. Erro
+    // transitorio do banco, constraint violada ou o intent ter mudado para
+    // failed/expired no meio do caminho NAO podem virar "pago" -- antes isso
+    // respondia paid com token nulo e o tablet mostrava sucesso sem fotos.
+    const { data: atual } = await db
+      .from("payment_intents")
+      .select("status")
+      .eq("id", intent.id)
+      .maybeSingle();
+
+    if (atual?.status !== "paid") {
+      console.error("[confirm] liberacao nao aplicada", intent.id, atual?.status, updateError);
+      return {
+        status: "pending", httpStatus: 503, code: "ERRO_INTERNO", retry: true,
+        orderId: intent.order_id,
+      };
+    }
+
     // Corrida perdida: outra entrada confirmou primeiro. Nao e erro.
-    console.warn("[confirm] intent confirmado em paralelo", intent.id, updateError);
+    console.warn("[confirm] intent confirmado em paralelo", intent.id);
     const { data: order } = await db
       .from("orders")
       .select("download_token, download_expires_at")
