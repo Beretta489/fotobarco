@@ -20,3 +20,12 @@ bot/node
 
 # lixo do Supabase CLI
 supabase/.temp/
+
+# Certificado e credenciais do Efi -- NUNCA no repositorio. O ideal e guardar
+# tudo FORA desta pasta (ver EFI_SETUP.md); estas linhas sao a rede de seguranca.
+*.pfx
+*.b64
+efi-certs/
+efi-*.env
+homologacao.env
+producao.env

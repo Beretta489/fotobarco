@@ -73,7 +73,33 @@ as variações prováveis, mas só uma cobrança real mostra qual campo vem. É 
 
 ## 5. Credenciais antigas que precisam ser revogadas
 
-Ficaram no projeto do provedor anterior (EFI Bank), que não é mais usado:
+Ficaram no projeto de uma integração EFI anterior, que rodava no app:
 `EFI_CLIENT_ID`, `EFI_CLIENT_SECRET`, `EFI_PIX_KEY`. Se chegaram a valer em
 produção, **revogue no painel da EFI** — credencial que passou por um
 repositório deve ser tratada como exposta, mesmo que ninguém tenha usado.
+
+**Não reaproveite essas credenciais na integração nova.** Crie aplicação e
+certificado novos (seção 6).
+
+---
+
+## 6. Pix pelo Efí Bank (integração nova, no servidor)
+
+O Pix agora pode sair pelo Efí, escolhido pelo secret `PIX_PROVIDER=efi`. Tudo
+fica nas Edge Functions; nada no app. Passo a passo completo, conversão do
+certificado e roteiro de teste: **[EFI_SETUP.md](EFI_SETUP.md)**.
+
+O que a empresa precisa fornecer, **por ambiente** (homologação e produção):
+
+| Valor | Secret (homologação / produção) |
+|---|---|
+| Client ID | `EFI_HOMOLOG_CLIENT_ID` / `EFI_PROD_CLIENT_ID` |
+| Client Secret | `EFI_HOMOLOG_CLIENT_SECRET` / `EFI_PROD_CLIENT_SECRET` |
+| Chave Pix que recebe | `EFI_HOMOLOG_PIX_KEY` / `EFI_PROD_PIX_KEY` |
+| Certificado `.p12` (vira dois PEMs em base64) | `EFI_*_CERT_PEM_B64` e `EFI_*_KEY_PEM_B64` |
+
+Gerados por nós: `EFI_HOMOLOG_WEBHOOK_SECRET` / `EFI_PROD_WEBHOOK_SECRET`.
+Seletores: `PIX_PROVIDER` (`efi` | `infinitepay`) e `EFI_ENV`
+(`homologacao` | `producao`).
+
+Com o Efí em uso, o `INFINITEPAY_HANDLE` deixa de ser necessário para o Pix.
