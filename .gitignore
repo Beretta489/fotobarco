@@ -29,3 +29,5 @@ efi-certs/
 efi-*.env
 homologacao.env
 producao.env
+script.env
+secrets.env
