@@ -43,7 +43,7 @@ export interface DispatchResult {
 
 /**
  * Agenda o envio sem segurar a resposta HTTP. O tablet nao precisa esperar o
- * n8n para mostrar a tela de sucesso -- e o webhook da InfinitePay nao pode
+ * n8n para mostrar a tela de sucesso -- e o webhook do Efi nao pode
  * estourar o timeout por causa de um terceiro lento.
  */
 export function scheduleWhatsappDispatch(db: SupabaseClient, orderId: string): void {

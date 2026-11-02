@@ -15,7 +15,7 @@
 //     pedido a cada poucas tentativas.
 //
 // So vale para intents credit/debit/cash. Um intent Pix nunca e liberado aqui:
-// Pix so sai com a InfinitePay confirmando (confirmIntent).
+// Pix so sai com o Efi confirmando (confirmIntent).
 //
 // Entrada: { orderNsu, password }
 // Saida:   { ok, status, error?, orderId, downloadToken?, downloadExpiresAt? }

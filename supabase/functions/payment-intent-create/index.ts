@@ -16,8 +16,8 @@
 //
 // Saida (pix):        { ok, intentId, orderId, orderNsu, amountCents, expiresAt,
 //                       provider, pixCopiaECola, checkoutUrl }
-//   pixCopiaECola = BR Code (Efi). checkoutUrl = link (InfinitePay) ou, no
-//   Efi, o mesmo copia e cola -- compatibilidade com o app antigo.
+//   pixCopiaECola = BR Code do Efi. checkoutUrl = o mesmo copia e cola --
+//   compatibilidade com o app antigo.
 // Saida (atendente):  { ok, intentId, orderId, orderNsu, amountCents }
 //   credit/debit/cash nao tem cobranca integrada: o atendente recebe fora do
 //   app e libera com a senha em payment-attendant-confirm.
@@ -177,8 +177,8 @@ Deno.serve(async (req) => {
 
     // --- Pix: cria a cobranca no provedor ANTES de gravar o intent ---------
     // Se o provedor recusar, nao queremos um intent orfao apontando para uma
-    // cobranca que nunca existiu. O provedor (Efi ou InfinitePay) e escolhido
-    // pelo secret PIX_PROVIDER -- ver _shared/pix/index.ts.
+    // cobranca que nunca existiu. O ambiente do Efi vem do secret EFI_ENV --
+    // ver _shared/pix/index.ts.
     //
     // O txid da cobranca e o proprio orderNsu: assim webhook, polling e
     // recuperacao continuam localizando o pedido pela mesma chave de sempre.
@@ -214,8 +214,6 @@ Deno.serve(async (req) => {
         installments,
         status: "pending",
         expires_at: expiresAt.toISOString(),
-        checkout_url: charge?.checkoutUrl ?? null,
-        invoice_slug: charge?.invoiceSlug ?? null,
         provider: charge?.provider ?? null,
         provider_env: charge?.env ?? null,
         provider_loc_id: charge?.locId ?? null,
@@ -253,14 +251,14 @@ Deno.serve(async (req) => {
     if (paymentMethod === "pix" && charge) {
       // O tablet transforma isto em QR Code; o cliente escaneia com o celular.
       //
-      // 'checkoutUrl' continua existindo para o APK antigo: no Efi ele recebe
+      // 'checkoutUrl' continua existindo para o APK antigo: ele recebe
       // o proprio copia e cola, que tambem e um QR Code valido para o app do
       // banco. A versao nova le 'pixCopiaECola'.
       return json({
         ...base,
         provider: charge.provider,
         pixCopiaECola: charge.copiaECola,
-        checkoutUrl: charge.checkoutUrl ?? charge.copiaECola,
+        checkoutUrl: charge.copiaECola,
       });
     }
 

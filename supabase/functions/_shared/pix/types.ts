@@ -3,11 +3,10 @@
 // =============================================================================
 // Tudo que o resto do sistema sabe sobre "quem gera e confirma o Pix" passa por
 // esta interface. Trocar de provedor = escrever outro arquivo ao lado de efi.ts
-// e infinitepay.ts e registra-lo em index.ts. Nenhuma Edge Function importa um
-// provedor direto.
+// e registra-lo em index.ts. Nenhuma Edge Function importa um provedor direto.
 // =============================================================================
 
-export type PixProviderName = "efi" | "infinitepay";
+export type PixProviderName = "efi";
 
 export interface CreateChargeInput {
   /**
@@ -28,9 +27,6 @@ export interface CreatedCharge {
   env: string | null;
   /** BR Code (Pix copia e cola). E ele que vira o QR Code no tablet. */
   copiaECola: string | null;
-  /** URL de checkout, para provedores baseados em link (InfinitePay). */
-  checkoutUrl: string | null;
-  invoiceSlug: string | null;
   locId: string | null;
   providerStatus: string | null;
 }
@@ -61,13 +57,11 @@ export interface PixProvider {
   createCharge(input: CreateChargeInput): Promise<CreatedCharge>;
 
   /**
-   * Consulta a cobranca pelo txid. Provedores que implementam isto sao
-   * confirmados por confirmByCharge() (fonte da verdade = o provedor, sem
-   * precisar de NSU vindo de fora). Quem nao implementa cai no fluxo legado
-   * da InfinitePay, que depende do transaction_nsu entregue pelo webhook.
+   * Consulta a cobranca pelo txid -- a fonte da verdade do pagamento, usada
+   * por confirmIntent() (sem precisar de NSU vindo de fora).
    *
    * Erro de rede / 5xx LANCA excecao (vira "tente de novo"); cobranca
    * inexistente devolve paid=false.
    */
-  checkCharge?(txid: string): Promise<ChargeStatus>;
+  checkCharge(txid: string): Promise<ChargeStatus>;
 }

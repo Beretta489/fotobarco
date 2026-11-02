@@ -281,8 +281,6 @@ export function efiProvider(env: EfiEnv): PixProvider {
         provider: "efi",
         env,
         copiaECola,
-        checkoutUrl: null,
-        invoiceSlug: null,
         locId,
         providerStatus: typeof cob?.status === "string" ? cob.status : null,
       };

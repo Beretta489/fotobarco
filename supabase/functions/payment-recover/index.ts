@@ -3,18 +3,17 @@
 // =============================================================================
 // POR QUE ESTA FUNCTION EXISTE
 //
-// O payment_check da InfinitePay exige 'transaction_nsu', e esse valor so nasce
-// QUANDO o pagamento acontece -- chegando ate nos pelo webhook. Se o webhook se
-// perde (internet do barco caiu, provedor atrasou, URL fora do ar), o Pix fica
-// 'pending' no nosso banco mesmo tendo sido pago, e o intent expira em 15
-// minutos. Resultado: o cliente pagou e nao recebe as fotos.
+// Se o webhook do Efi se perde e o tablet fecha a tela do Pix (o polling
+// para), o Pix fica 'pending' no nosso banco mesmo tendo sido pago, e o
+// intent expira em 15 minutos. Resultado: o cliente pagou e nao recebe as
+// fotos.
 //
-// Aqui o operador informa o NSU que aparece no comprovante do celular do
-// cliente, e o servidor pergunta a InfinitePay se aquela transacao existe e se
-// o valor bate.
+// Aqui o operador abre o pedido e o servidor consulta GET /v2/cob/:txid (o
+// txid e o proprio orderNsu). Nao precisa de NSU: libera se a cobranca estiver
+// CONCLUIDA com o valor certo.
 //
 // ISTO NAO E UM ATALHO. A liberacao passa pelo MESMO confirmIntent() do fluxo
-// normal -- conferencia no provedor, valor igual, anti-replay, teto de
+// normal -- consulta da cobranca, valor igual, anti-replay, teto de
 // tentativas e update condicionado ao status. O unico ponto que muda e a JANELA
 // DE TEMPO: o fluxo automatico morre em 15 minutos, a recuperacao vale por
 // alguns dias (PAYMENT_RECOVERY_WINDOW_DAYS).
@@ -25,18 +24,13 @@
 //   poder de ignorar a expiracao seria entregar esse poder a qualquer pessoa
 //   que baixe o app. Esta function exige um usuario REALMENTE logado no painel.
 //
-// EFI: aqui nao precisa de NSU. O txid da cobranca e o proprio orderNsu, entao
-// o servidor consulta GET /v2/cob/:txid e libera se estiver CONCLUIDA com o
-// valor certo -- mesmas regras de confirmByCharge(), mesma janela de dias.
-//
-// Entrada: { orderNsu, transactionNsu }   (transactionNsu opcional no Efi)
+// Entrada: { orderNsu }   (um transactionNsu antigo e ignorado)
 // Saida:   { ok, status, error?, orderId, downloadToken?, downloadExpiresAt? }
 // =============================================================================
 
 import { config, corsHeaders, errorResponse, json } from "../_shared/config.ts";
 import { serviceClient } from "../_shared/db.ts";
 import { confirmIntent } from "../_shared/confirm.ts";
-import { providerForIntent } from "../_shared/pix/index.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -78,32 +72,8 @@ Deno.serve(async (req) => {
     const orderNsu = String(body.orderNsu ?? "").trim();
     if (!orderNsu) return errorResponse("ORDER_NSU_AUSENTE");
 
-    const transactionNsu = String(body.transactionNsu ?? "").trim();
-
-    // Efi: o servidor consulta a cobranca pelo txid (= orderNsu) e descobre
-    // sozinho se foi paga -- o NSU digitado nao e necessario nem usado.
-    // InfinitePay: o payment_check exige o NSU do comprovante.
-    const { data: alvo, error: alvoError } = await db
-      .from("payment_intents")
-      .select("provider, provider_env")
-      .eq("order_nsu", orderNsu)
-      .maybeSingle();
-
-    // Sem isto, um erro de banco viraria "digite o NSU" num Pix do Efi.
-    if (alvoError) {
-      console.error("[recover] falha ao consultar intent", alvoError);
-      return errorResponse("ERRO_INTERNO", 500);
-    }
-
-    const consultaPorCobranca = Boolean(alvo && providerForIntent(alvo).checkCharge);
-    if (!consultaPorCobranca && !transactionNsu) return errorResponse("NSU_AUSENTE");
-
     // ------------------------------------------- 3. mesma porta de sempre ---
-    const result = await confirmIntent(db, {
-      orderNsu,
-      transactionNsu,
-      source: "recovery",
-    });
+    const result = await confirmIntent(db, { orderNsu, source: "recovery" });
 
     console.log(
       `[recover] ${user.email ?? user.id} tentou liberar ${orderNsu}: ${result.status}`,

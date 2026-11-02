@@ -3,22 +3,8 @@
 // =============================================================================
 // Usado pela tela de Pix enquanto o cliente escaneia o QR Code no celular dele.
 //
-// ┌──────────────────── LIMITACAO IMPORTANTE DO FLUXO PIX ─────────────────────┐
-// │ O payment_check da InfinitePay exige 'transaction_nsu' -- e esse valor so  │
-// │ nasce QUANDO o pagamento acontece, chegando pelo webhook.                  │
-// │                                                                            │
-// │ Antes disso o tablet nao tem o que perguntar ao provedor. Ou seja:         │
-// │                                                                            │
-// │   quem confirma um Pix e SEMPRE o webhook (payment-webhook).               │
-// │   este endpoint so LE o resultado que o webhook ja gravou.                 │
-// │                                                                            │
-// │ Consequencia: se o webhook nao chegar, o Pix fica pendente mesmo tendo     │
-// │ sido pago. Por isso existe o modo de recuperacao abaixo.                   │
-// │                                                                            │
-// │ EFI: essa limitacao NAO existe. O txid e conhecido desde a criacao, entao  │
-// │ este endpoint tambem consulta a cobranca no Efi (com freio de frequencia)  │
-// │ e confirma por la -- e a reserva do webhook.                               │
-// └────────────────────────────────────────────────────────────────────────────┘
+// Alem de ler o banco, consulta a cobranca no Efi (com freio de frequencia) e
+// confirma por la -- e a reserva caso o webhook nao chegue.
 //
 // Entrada: { orderNsu }
 // Saida:   { ok, status, orderId, downloadToken?, downloadExpiresAt? }
@@ -96,8 +82,8 @@ Deno.serve(async (req) => {
     if (!intent) return errorResponse("PAGAMENTO_NAO_ENCONTRADO", 404);
 
     // ------------------------- reserva: consultar a cobranca no provedor ----
-    // Provedores que consultam por txid (Efi) permitem conferir o Pix mesmo
-    // que o webhook nao chegue. Isto NAO reabre o furo descrito acima: a
+    // A consulta por txid permite conferir o Pix mesmo que o webhook nao
+    // chegue. Isto NAO reabre o furo descrito acima: a
     // entrada continua sendo so o orderNsu (128 bits aleatorios), e quem
     // decide e o GET /v2/cob/:txid -- nao ha nada para o chamador adivinhar.
     //
@@ -107,7 +93,7 @@ Deno.serve(async (req) => {
     if (
       intent.payment_method === "pix"
       && ["pending", "expired"].includes(intent.status)
-      && providerForIntent(intent).checkCharge
+      && providerForIntent(intent) !== null
       && await reservarConsulta(db, intent.id)
     ) {
       const r = await confirmIntent(db, { orderNsu, source: "polling" });

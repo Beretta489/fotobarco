@@ -33,8 +33,8 @@ tablet ──payment-status (a cada 3 s)──▶ lê o banco e, no máximo a ca
   único: um mesmo pagamento nunca libera dois pedidos.
 - **O webhook nunca é prova de pagamento.** Ele só diz quais txids consultar. A
   liberação depende de `GET /v2/cob/:txid` responder `CONCLUIDA` com o valor exato.
-- **Cada webhook só toca o seu provedor.** O do Efí ignora pedidos da
-  InfinitePay; o da InfinitePay (público, sem assinatura) não alcança pedidos do Efí.
+- **Só o Efí:** o Pix é exclusivo do Efí (a InfinitePay foi removida do código
+  em 01/11/2026). Chamada ao webhook sem `env`/`hmac` válidos → 401.
 - **Idempotente:** webhook, polling, reenvio do Efí e recuperação manual podem
   chegar juntos. Só um libera; os outros recebem "já pago" com o mesmo link, e o
   WhatsApp sai uma vez.
@@ -49,8 +49,7 @@ tablet ──payment-status (a cada 3 s)──▶ lê o banco e, no máximo a ca
 - **Recuperação manual** (`payment-recover`, tela "Pix pendentes") funciona com o
   Efí **sem NSU**: o servidor consulta a cobrança e libera se ela estiver paga.
 
-Código: `supabase/functions/_shared/pix/` (`efi.ts`, `infinitepay.ts`,
-`index.ts`, `types.ts`). Trocar de provedor = um arquivo novo nessa pasta.
+Código: `supabase/functions/_shared/pix/` (`efi.ts`, `index.ts`, `types.ts`). Trocar de provedor = um arquivo novo nessa pasta.
 
 ---
 
@@ -136,12 +135,11 @@ ambiente em que nasceu e é sempre conferida nele.
 | Chave privada | `EFI_HOMOLOG_KEY_PEM_B64` | `EFI_PROD_KEY_PEM_B64` | conteúdo de `efi-key.b64` |
 | Segredo do webhook | `EFI_HOMOLOG_WEBHOOK_SECRET` | `EFI_PROD_WEBHOOK_SECRET` | aleatório, gerado por você |
 
-**Chaves da virada** — de propósito fora do `secrets.env`, para que cadastrar
-credenciais nunca ligue um ambiente sozinho:
+**Chave da virada** — de propósito fora do `secrets.env`, para que cadastrar
+credenciais nunca ligue a produção sozinha:
 
 | Secret | Valores | Padrão se ausente |
 |---|---|---|
-| `PIX_PROVIDER` | `efi` / `infinitepay` | `infinitepay` (comportamento atual) |
 | `EFI_ENV` | `homologacao` / `producao` | `homologacao` |
 
 **Opcionais:** `EFI_WEBHOOK_ALLOWED_IPS` (ex.: `34.193.116.226`; vazio = não
@@ -167,10 +165,10 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 Depois, para a homologação:
 
 ```bash
-npx supabase secrets set PIX_PROVIDER=efi EFI_ENV=homologacao --project-ref vofpisizzubbhpidgvoz
+npx supabase secrets set EFI_ENV=homologacao --project-ref vofpisizzubbhpidgvoz
 ```
 
-(ou os mesmos dois pelo painel). Confira os **nomes** cadastrados — o comando
+(ou pelo painel). Confira os **nomes** cadastrados — o comando
 mostra só nome e hash, nunca o valor:
 
 ```bash
@@ -214,8 +212,8 @@ npx supabase functions deploy payment-recover --project-ref vofpisizzubbhpidgvoz
 `payment-attendant-confirm`, `whatsapp-resend` e `payment-confirm` **não são
 republicadas**.
 
-Com `PIX_PROVIDER` ausente ou `infinitepay`, esse deploy não muda o
-comportamento atual. A virada é o secret.
+Sem os secrets `EFI_*` do ambiente, a geração do Pix falha (`FALHA_AO_GERAR_PIX`);
+cartão e dinheiro pelo atendente continuam funcionando.
 
 ---
 
@@ -310,8 +308,7 @@ Esperado: HTTP 200 e nenhum `payment_confirmed` novo, nenhum WhatsApp novo.
 - O mesmo `curl` sem `hmac`, ou com `hmac` errado → HTTP 401; nada muda.
 - Com `hmac` certo e o txid de um pedido **não pago** (passo 6) → HTTP 200 e o
   pedido continua `pending`: o servidor consultou o Efí, que disse `ATIVA`.
-- No formato da InfinitePay (`{"order_nsu":"<txid>","transaction_nsu":"x"}`,
-  sem `hmac`) → HTTP 200 `ignored`; o pedido do Efí não é tocado.
+- Corpo qualquer sem `env`/`hmac` na URL → HTTP 401; o pedido não é tocado.
 
 **Passo 6 — Pix não pago e expiração (R$ 15,00)**
 1. Preço de volta em 1500 e um pedido Pix.
@@ -344,19 +341,10 @@ Esperado: HTTP 200 e nenhum `payment_confirmed` novo, nenhum WhatsApp novo.
 1. Aplicação, certificado e chave de **produção** no Efí (seção 6).
 2. Secrets `EFI_PROD_*` (seção 4) e `token` com o `script.env` de produção.
 3. `npx supabase secrets set EFI_ENV=producao --project-ref vofpisizzubbhpidgvoz`
-   (e `PIX_PROVIDER=efi`, se ainda não estiver).
 4. `set` do webhook de produção.
 5. Um Pix real de valor baixo, do começo ao fim.
 
-Só depois disso, e com a sua confirmação, o código da InfinitePay pode sair.
-
-## 9. Voltar para a InfinitePay
-
-`npx supabase secrets set PIX_PROVIDER=infinitepay --project-ref vofpisizzubbhpidgvoz`.
-Cobranças Efí já abertas continuam sendo conferidas no Efí; as novas saem pela
-InfinitePay.
-
-## 10. Riscos conhecidos
+## 9. Riscos conhecidos
 
 - **mTLS nas Edge Functions.** O `Deno.createHttpClient({ cert, key })` é o único
   jeito de apresentar o certificado a partir de uma Edge Function. Há relato

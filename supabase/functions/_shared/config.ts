@@ -8,8 +8,7 @@
 //
 // ┌──────────────────────── COMO CONFIGURAR OS SEGREDOS ─────────────────────┐
 // │ Pelo CLI (recomendado):                                                  │
-// │   supabase secrets set INFINITEPAY_HANDLE=seu_infinitetag                │
-// │   supabase secrets set APP_DEEPLINK_SCHEME=fotobarco                     │
+// │   supabase secrets set EFI_ENV=producao                                  │
 // │   supabase secrets set ATTENDANT_PASSWORD=<senha do atendente>           │
 // │                                                                          │
 // │ Ou pelo painel: Supabase > Project Settings > Edge Functions > Secrets    │
@@ -42,47 +41,7 @@ export const config = {
   // Nunca logar, nunca devolver em resposta HTTP, nunca commitar.
   serviceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY"),
 
-  infinitepay: {
-    // ┌──────────────────────────────────────────────────────────────────────┐
-    // │ >>> PREENCHER: dados que a InfinitePay fornece <<<                   │
-    // └──────────────────────────────────────────────────────────────────────┘
-
-    // Seu InfiniteTag -- o @ da conta InfinitePay que vai RECEBER o dinheiro.
-    // Onde achar: app InfinitePay > Perfil > InfiniteTag (ex.: "jangalanchashow").
-    // Informe sem o "@".
-    //
-    // Nao e exigido no boot: so o Pix precisa dele (ver requireHandle() em
-    // infinitepay.ts). Assim cartao/dinheiro pelo atendente funcionam mesmo
-    // antes de a conta InfinitePay estar configurada.
-    handle: optional("INFINITEPAY_HANDLE", ""),
-
-    // Identificador do SEU app, combinado com a InfinitePay. Aparece no
-    // relatorio deles como origem da venda. Texto livre sem espacos.
-    appClientReferrer: optional("INFINITEPAY_APP_REFERRER", "FotoBarco"),
-
-    // Endpoint de conferencia server-side da transacao (Checkout / Pix).
-    paymentCheckUrl: optional(
-      "INFINITEPAY_PAYMENT_CHECK_URL",
-      "https://api.checkout.infinitepay.io/payment_check",
-    ),
-
-    // Trava de seguranca. Com 'true' (padrao e recomendado), um pagamento SO e
-    // confirmado se a InfinitePay responder que existe e bate o valor.
-    //
-    // Colocar 'false' faz o sistema aceitar o webhook como prova de pagamento
-    // -- e o webhook nao tem assinatura, qualquer um consegue posta-lo.
-    // Use 'false' apenas em teste, nunca com dinheiro real.
-    requireProviderCheck:
-      optional("INFINITEPAY_REQUIRE_PROVIDER_CHECK", "true") === "true",
-  },
-
   pix: {
-    // Quem gera as cobrancas Pix NOVAS: "efi" ou "infinitepay".
-    // Padrao "infinitepay" para o deploy nao mudar nada sozinho: a virada para
-    // o Efi e um `supabase secrets set PIX_PROVIDER=efi`, e voltar e o mesmo
-    // comando com "infinitepay". Ver EFI_SETUP.md.
-    provider: optional("PIX_PROVIDER", "infinitepay").toLowerCase(),
-
     // Ambiente do Efi: "homologacao" ou "producao". Cada um tem seus proprios
     // secrets (EFI_HOMOLOG_* / EFI_PROD_*) -- ver _shared/pix/efi.ts.
     // Padrao homologacao: esquecer este secret gera Pix de teste (que nenhum
@@ -107,10 +66,6 @@ export const config = {
   },
 
   app: {
-    // Scheme do app, usado no redirect_url do Checkout Pix. Precisa bater com
-    // o "scheme" declarado em app.config.js.
-    deeplinkScheme: optional("APP_DEEPLINK_SCHEME", "fotobarco"),
-
     // OPCIONAL. Se cadastrado, somente esta conta consegue liberar um pagamento
     // na mao pela payment-recover. Sem ele, qualquer usuario autenticado do
     // projeto passa -- hoje so existe a conta do admin, mas cadastrar fecha a
@@ -173,8 +128,7 @@ export const config = {
     timeoutMs: Number(optional("N8N_WEBHOOK_TIMEOUT_MS", "15000")),
   },
 
-  // Teto de tentativas de confirmacao por intent. Barra forca bruta em cima do
-  // endpoint de confirmacao (tentar varios nsu ate acertar um valido).
+  // Teto de tentativas da recuperacao manual (payment-recover) por intent.
   maxConfirmAttempts: Number(optional("PAYMENT_MAX_CONFIRM_ATTEMPTS", "10")),
 
   // Janela da RECUPERACAO MANUAL do Pix (payment-recover), contada a partir da
@@ -182,8 +136,8 @@ export const config = {
   // janela e mais longa de proposito, porque a falha que ela resolve (webhook
   // que nao chegou) so e percebida depois -- as vezes no fechamento do caixa.
   //
-  // Nao e um furo: a liberacao continua exigindo que a InfinitePay confirme a
-  // transacao e o valor. O que a janela limita e por quanto tempo vale a pena
+  // Nao e um furo: a liberacao continua exigindo que o Efi confirme a
+  // cobranca e o valor. O que a janela limita e por quanto tempo vale a pena
   // deixar essa porta aberta.
   recoveryWindowDays: Number(optional("PAYMENT_RECOVERY_WINDOW_DAYS", "7")),
 };

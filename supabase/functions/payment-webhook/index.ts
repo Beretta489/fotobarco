@@ -1,17 +1,15 @@
 // =============================================================================
-// payment-webhook -- o provedor avisa que um Pix caiu (Efi ou InfinitePay)
+// payment-webhook -- o Efi avisa que um Pix caiu
 // =============================================================================
 // ┌─────────────────────── ATENCAO AO FAZER O DEPLOY ───────────────────────┐
-// │ Esta function precisa ser PUBLICA -- nenhum dos provedores manda JWT:   │
+// │ Esta function precisa ser PUBLICA -- o Efi nao manda JWT:               │
 // │                                                                         │
 // │   supabase functions deploy payment-webhook --no-verify-jwt             │
 // │                                                                         │
 // │ As outras functions NAO levam essa flag.                                │
 // └─────────────────────────────────────────────────────────────────────────┘
 //
-// DOIS FORMATOS CHEGAM AQUI
-//
-// 1. Efi -- URL cadastrada em PUT /v2/webhook/:chave (ver EFI_SETUP.md):
+// URL cadastrada em PUT /v2/webhook/:chave (ver EFI_SETUP.md):
 //
 //      .../functions/v1/payment-webhook?env=<homologacao|producao>&hmac=<segredo>&ignorar=
 //
@@ -30,9 +28,6 @@
 //
 //    'ignorar=' no fim impede o Efi de acrescentar "/pix" ao caminho.
 //
-// 2. InfinitePay (legado) -- { invoice_slug, transaction_nsu, order_nsu, ... }
-//    sem assinatura; tratado como aviso e conferido no payment_check.
-//
 // Codigos de retorno: 200 encerra a fila de reenvio do provedor. 503 so quando
 // um reenvio tem chance de dar certo (provedor/banco indisponivel). 401/403
 // para chamadas sem o segredo.
@@ -41,7 +36,6 @@
 import { config, corsHeaders, json } from "../_shared/config.ts";
 import { logEvent, serviceClient } from "../_shared/db.ts";
 import { confirmIntent } from "../_shared/confirm.ts";
-import type { WebhookPayload } from "../_shared/infinitepay.ts";
 import { efiWebhookSecret, parseEfiEnv, safeEqual, txidsFromWebhook } from "../_shared/pix/efi.ts";
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
@@ -56,11 +50,8 @@ Deno.serve(async (req) => {
     const parsed = await req.json().catch(() => ({}));
     const body = parsed && typeof parsed === "object" ? parsed : {};
 
-    // Presenca do hmac na URL = webhook do Efi. A InfinitePay nunca manda.
-    if (url.searchParams.has("hmac") || Array.isArray(body?.pix)) {
-      return await handleEfi(db, req, url, body);
-    }
-    return await handleInfinitePay(db, body as WebhookPayload);
+    // Qualquer chamada sem env/hmac validos morre com 401 dentro de handleEfi.
+    return await handleEfi(db, req, url, body);
   } catch (e) {
     console.error("[webhook] erro inesperado", e);
     return json({ ok: false }, 503);
@@ -131,14 +122,11 @@ async function handleEfi(
   // valor exato. E idempotente: reenvio do Efi para um pedido ja pago devolve
   // "ja pago" sem liberar de novo nem reenviar as fotos.
   //
-  // allowedProviders: ["efi"] -- um txid que por acaso seja de um intent da
-  // InfinitePay e ignorado aqui (nunca cai no fluxo legado por este caminho).
-  //
   // Em lotes paralelos de 10: o Efi espera resposta em ate 60 s, e cada
   // consulta pode levar ate 10 s. Na pratica chega 1 txid por notificacao.
   const confirmar = async (txid: string) => {
     try {
-      const r = await confirmIntent(db, { orderNsu: txid, source: "webhook", allowedProviders: ["efi"] });
+      const r = await confirmIntent(db, { orderNsu: txid, source: "webhook" });
       return { txid, status: r.status as string, retry: Boolean(r.retry) };
     } catch (e) {
       console.error("[webhook/efi] falha ao confirmar", txid.slice(-8), e);
@@ -156,40 +144,4 @@ async function handleEfi(
 
   if (reenviar) return json({ ok: false, error: "TENTAR_DE_NOVO" }, 503);
   return json({ ok: true, resultados }, 200);
-}
-
-// =============================================================================
-// InfinitePay (legado -- sem mudanca de comportamento)
-// =============================================================================
-
-async function handleInfinitePay(db: SupabaseClient, body: WebhookPayload): Promise<Response> {
-  // Registra a chegada antes de qualquer validacao: mesmo um webhook forjado
-  // vira registro de auditoria.
-  await logEvent(db, { type: "deeplink_returned", payload: { via: "webhook", ...body } });
-
-  const orderNsu = String(body.order_nsu ?? "").trim();
-  const transactionNsu = String(body.transaction_nsu ?? "").trim();
-
-  if (!orderNsu || !transactionNsu) {
-    console.warn("[webhook] payload sem order_nsu/transaction_nsu");
-    return json({ ok: false, error: "PAYLOAD_INCOMPLETO" }, 400);
-  }
-
-  const result = await confirmIntent(db, {
-    orderNsu,
-    transactionNsu,
-    slug: body.invoice_slug ?? null,
-    source: "webhook",
-    // Este endpoint nao tem autenticacao: nao pode tocar pedidos do Efi.
-    allowedProviders: ["infinitepay"],
-  });
-
-  if (result.retry) return json({ ok: false, error: result.code }, 503);
-
-  if (result.status === "not_found") {
-    console.warn("[webhook] order_nsu desconhecido");
-    return json({ ok: true, ignored: true }, 200);
-  }
-
-  return json({ ok: true, status: result.status }, 200);
 }
