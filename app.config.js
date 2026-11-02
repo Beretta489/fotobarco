@@ -7,11 +7,8 @@ export default {
     version: "1.0.0",
     orientation: "portrait",
 
-    // Scheme do deeplink de retorno do InfiniteTap. Precisa ser IDENTICO ao
-    // secret APP_DEEPLINK_SCHEME das Edge Functions: e por
-    // "fotobarco://payment/result" que o app InfinitePay devolve o resultado da
-    // cobranca. Mudou aqui, mude la tambem -- senao o retorno se perde e o
-    // pedido fica pendente mesmo com o cliente tendo pago.
+    // Scheme de deep link do app (fotobarco://). Nenhum fluxo de pagamento
+    // depende dele hoje.
     scheme: "fotobarco",
 
     icon: "./assets/icon.png",

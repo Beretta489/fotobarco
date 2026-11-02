@@ -1,14 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  Image, ActivityIndicator, StatusBar, Dimensions, Animated,
+  Image, ActivityIndicator, StatusBar, Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../services/supabase';
 import { sessionsService } from '../services/sessions';
 import { colors, spacing, radius } from '../utils/theme';
-
-const { width, height } = Dimensions.get('window');
+import { useScale, useScaledStyles } from '../utils/responsive';
 
 const FIXED_SESSIONS = [
   { id: 's1', name: 'Passeio 09:00', time: '09:00' },
@@ -25,27 +24,19 @@ function getMiddlePhoto(photos) {
 }
 
 const COLS = 3;
-const CARD_SIZE = (width - spacing.lg * 2 - spacing.sm * (COLS - 1)) / COLS;
 
 // Horarios: grade 3x2 ocupando ~53% da largura (o resto fica pro golfinho),
 // limitada pela altura para as duas linhas caberem abaixo do cabecalho.
 const SESSIONS_SHARE = 0.53;
 const SESSION_COLS = 3;
-const SESSION_GAP = spacing.md;
-const SESSIONS_AREA = (width - spacing.lg * 2) * SESSIONS_SHARE;
-const SESSION_MAX_H = (height - 140 - SESSION_GAP) / 2;
-const SESSION_CARD_W = Math.floor((SESSIONS_AREA - SESSION_GAP * (SESSION_COLS - 1)) / SESSION_COLS) - 1;
-const SESSION_CARD_H = Math.min(SESSION_CARD_W * 1.05, SESSION_MAX_H);
-const SESSIONS_GRID_H = SESSION_CARD_H * 2 + SESSION_GAP;
 
 // Golfinho: ocupa a coluna dele mantendo a proporcao da imagem (840x546),
 // sem passar da altura da grade de horarios.
 const DOLPHIN_RATIO = 840 / 546;
-const DOLPHIN_COL_W = (width - spacing.lg * 2) * (1 - SESSIONS_SHARE) - spacing.lg;
-const DOLPHIN_W = Math.min(DOLPHIN_COL_W, SESSIONS_GRID_H * DOLPHIN_RATIO);
-const DOLPHIN_H = DOLPHIN_W / DOLPHIN_RATIO;
 
 export default function SelectGroupScreen({ navigation }) {
+  const k = useScale();
+  const styles = useScaledStyles(createStyles);
   const [step, setStep] = useState('session');
   const [selectedSession, setSelectedSession] = useState(null);
   const [groups, setGroups] = useState([]);
@@ -133,7 +124,7 @@ export default function SelectGroupScreen({ navigation }) {
             <Text style={styles.backText}>← Voltar</Text>
           </TouchableOpacity>
           <Text style={styles.headerBrand}>⛵ Jangalancha Show</Text>
-          <View style={{ width: 90 }} />
+          <View style={{ width: Math.round(90 * k) }} />
         </View>
 
         {loading ? (
@@ -238,34 +229,46 @@ export default function SelectGroupScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (k, width, height) => {
+  const z = (n) => Math.round(n * k);
+  const CARD_SIZE = Math.floor((width - z(spacing.lg) * 2 - z(spacing.sm) * (COLS - 1)) / COLS) - 1;
+  const SESSION_GAP = z(spacing.md);
+  const SESSIONS_AREA = (width - z(spacing.lg) * 2) * SESSIONS_SHARE;
+  const SESSION_MAX_H = (height - z(140) - SESSION_GAP) / 2;
+  const SESSION_CARD_W = Math.floor((SESSIONS_AREA - SESSION_GAP * (SESSION_COLS - 1)) / SESSION_COLS) - 1;
+  const SESSION_CARD_H = Math.min(SESSION_CARD_W * 1.05, SESSION_MAX_H);
+  const SESSIONS_GRID_H = SESSION_CARD_H * 2 + SESSION_GAP;
+  const DOLPHIN_COL_W = (width - z(spacing.lg) * 2) * (1 - SESSIONS_SHARE) - z(spacing.lg);
+  const DOLPHIN_W = Math.min(DOLPHIN_COL_W, SESSIONS_GRID_H * DOLPHIN_RATIO);
+  const DOLPHIN_H = DOLPHIN_W / DOLPHIN_RATIO;
+  return StyleSheet.create({
   container: { flex: 1 },
   gradient: { flex: 1, flexDirection: 'column' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
+    paddingHorizontal: z(spacing.lg), paddingTop: z(spacing.xl), paddingBottom: z(spacing.md),
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
     flexShrink: 0,
   },
-  backText: { color: colors.accentLight, fontSize: 20, fontWeight: '600' },
-  headerBrand: { fontSize: 22, fontWeight: '800', color: colors.white, letterSpacing: 1 },
-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-  loadingText: { color: colors.gold, fontSize: 16, fontWeight: '600' },
-  emptyText: { color: colors.accentLight, fontSize: 16, textAlign: 'center', lineHeight: 26 },
+  backText: { color: colors.accentLight, fontSize: z(20), fontWeight: '600' },
+  headerBrand: { fontSize: z(22), fontWeight: '800', color: colors.white, letterSpacing: z(1) },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: z(spacing.md) },
+  loadingText: { color: colors.gold, fontSize: z(16), fontWeight: '600' },
+  emptyText: { color: colors.accentLight, fontSize: z(16), textAlign: 'center', lineHeight: z(26) },
   errorText: {
-    color: colors.error, fontSize: 14, textAlign: 'center',
-    marginBottom: spacing.md, paddingHorizontal: spacing.lg,
+    color: colors.error, fontSize: z(14), textAlign: 'center',
+    marginBottom: z(spacing.md), paddingHorizontal: z(spacing.lg),
   },
   backBtn: {
-    marginTop: spacing.lg, paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl, borderRadius: radius.full,
+    marginTop: z(spacing.lg), paddingVertical: z(spacing.md),
+    paddingHorizontal: z(spacing.xl), borderRadius: z(radius.full),
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
   },
-  backBtnText: { color: colors.white, fontSize: 16, fontWeight: '600' },
+  backBtnText: { color: colors.white, fontSize: z(16), fontWeight: '600' },
   sessionContent: { flex: 1, justifyContent: 'center' },
   mainRow: {
     flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', paddingHorizontal: spacing.lg, gap: 0,
+    justifyContent: 'center', paddingHorizontal: z(spacing.lg), gap: 0,
   },
   dolphinWrap: { alignItems: 'center', justifyContent: 'center', flex: 1 - SESSIONS_SHARE },
   dolphinImage: { width: DOLPHIN_W, height: DOLPHIN_H },
@@ -276,26 +279,26 @@ const styles = StyleSheet.create({
   },
   sessionCard: {
     width: SESSION_CARD_W, height: SESSION_CARD_H,
-    borderRadius: radius.lg, overflow: 'hidden',
+    borderRadius: z(radius.lg), overflow: 'hidden',
     borderWidth: 2, borderColor: 'rgba(144,224,239,0.45)',
   },
   sessionCardInner: {
-    flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+    flex: 1, alignItems: 'center', justifyContent: 'center', gap: z(spacing.sm),
   },
   sessionTime: { fontSize: Math.round(SESSION_CARD_W * 0.26), fontWeight: '900', color: colors.white },
-  sessionHoras: { fontSize: 20, fontWeight: '600', color: colors.accentLight },
+  sessionHoras: { fontSize: z(20), fontWeight: '600', color: colors.accentLight },
   groupsOuter: { flex: 1, flexDirection: 'column' },
   groupInstruction: {
-    fontSize: 15, color: colors.gold, fontWeight: '700',
-    textAlign: 'center', paddingVertical: spacing.md, flexShrink: 0,
+    fontSize: z(15), color: colors.gold, fontWeight: '700',
+    textAlign: 'center', paddingVertical: z(spacing.md), flexShrink: 0,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,214,10,0.15)',
     backgroundColor: 'rgba(255,214,10,0.05)',
   },
-  scrollContent: { padding: spacing.lg },
-  row: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  scrollContent: { padding: z(spacing.lg) },
+  row: { flexDirection: 'row', gap: z(spacing.sm), marginBottom: z(spacing.sm) },
   groupCard: {
     width: CARD_SIZE, height: CARD_SIZE * 1.15,
-    borderRadius: radius.md, overflow: 'hidden',
+    borderRadius: z(radius.md), overflow: 'hidden',
     borderWidth: 2, borderColor: 'rgba(255,214,10,0.25)',
   },
   groupThumb: { width: '100%', height: '100%' },
@@ -303,15 +306,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center', justifyContent: 'center',
   },
-  groupThumbEmptyText: { fontSize: 48 },
+  groupThumbEmptyText: { fontSize: z(48) },
   groupOverlay: { ...StyleSheet.absoluteFillObject },
   groupInfo: {
-    position: 'absolute', bottom: 36, left: 0, right: 0, alignItems: 'center',
+    position: 'absolute', bottom: z(36), left: 0, right: 0, alignItems: 'center',
   },
-  groupLabel: { fontSize: 16, fontWeight: '900', color: colors.white },
+  groupLabel: { fontSize: z(16), fontWeight: '900', color: colors.white },
   tapHint: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(255,214,10,0.9)', paddingVertical: 7, alignItems: 'center',
+    backgroundColor: 'rgba(255,214,10,0.9)', paddingVertical: z(7), alignItems: 'center',
   },
-  tapHintText: { fontSize: 13, fontWeight: '900', color: colors.primary, letterSpacing: 1 },
+  tapHintText: { fontSize: z(13), fontWeight: '900', color: colors.primary, letterSpacing: z(1) },
 });
+};

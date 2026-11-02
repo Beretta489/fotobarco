@@ -5,8 +5,11 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, radius } from '../utils/theme';
+import { useScale, useScaledStyles } from '../utils/responsive';
 
 export default function PackageSelectScreen({ route, navigation }) {
+  const k = useScale();
+  const styles = useScaledStyles(createStyles);
   const { session, photos, group } = route.params;
   const [selected, setSelected] = useState(null);
 
@@ -93,7 +96,7 @@ export default function PackageSelectScreen({ route, navigation }) {
           <Text style={styles.dolphin}>🐬</Text>
           <Text style={styles.title}>Escolha seu Pacote</Text>
         </View>
-        <View style={{ width: 90 }} />
+        <View style={{ width: Math.round(90 * k) }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -143,51 +146,42 @@ export default function PackageSelectScreen({ route, navigation }) {
           </TouchableOpacity>
         ))}
 
-        <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>🐬 Jangalancha Show garante:</Text>
-          {[
-            '📸 Fotos em alta resolução',
-            '🔗 Link para download no celular',
-            '☁️ Disponível por 30 dias na nuvem',
-            '📱 Compartilhe via WhatsApp',
-          ].map((item) => (
-            <Text key={item} style={styles.infoItem}>{item}</Text>
-          ))}
-        </View>
       </ScrollView>
     </LinearGradient>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (k) => {
+  const z = (n) => Math.round(n * k);
+  return StyleSheet.create({
   container: { flex: 1 },
   sun: {
-    position: 'absolute', top: -80, right: -80,
-    width: 260, height: 260, borderRadius: 130,
+    position: 'absolute', top: z(-80), right: z(-80),
+    width: z(260), height: z(260), borderRadius: z(130),
     backgroundColor: colors.gold, opacity: 0.08,
   },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
+    paddingHorizontal: z(spacing.lg), paddingTop: z(spacing.xl), paddingBottom: z(spacing.md),
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  backText: { color: colors.accentLight, fontSize: 20, fontWeight: '600' },
+  backText: { color: colors.accentLight, fontSize: z(20), fontWeight: '600' },
   headerCenter: {
     flexDirection: 'row', alignItems: 'center',
-    gap: 8, flex: 1, justifyContent: 'center',
+    gap: z(8), flex: 1, justifyContent: 'center',
   },
-  dolphin: { fontSize: 32 },
-  title: { fontSize: 24, fontWeight: '900', color: colors.white },
-  content: { padding: spacing.lg, gap: spacing.lg, paddingBottom: 40 },
+  dolphin: { fontSize: z(32) },
+  title: { fontSize: z(24), fontWeight: '900', color: colors.white },
+  content: { padding: z(spacing.lg), gap: z(spacing.lg), paddingBottom: z(40) },
   subtitle: {
-    fontSize: 16, color: colors.accentLight,
-    textAlign: 'center', lineHeight: 26, fontWeight: '400',
+    fontSize: z(16), color: colors.accentLight,
+    textAlign: 'center', lineHeight: z(26), fontWeight: '400',
   },
   card: {
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1, borderColor: 'rgba(144,224,239,0.2)',
-    borderRadius: radius.lg, padding: spacing.lg,
-    gap: spacing.sm, position: 'relative', overflow: 'hidden',
+    borderRadius: z(radius.lg), padding: z(spacing.lg),
+    gap: z(spacing.sm), position: 'relative', overflow: 'hidden',
   },
   cardFeatured: {
     backgroundColor: 'rgba(255,214,10,0.1)',
@@ -200,37 +194,31 @@ const styles = StyleSheet.create({
   },
   featuredBadge: {
     backgroundColor: colors.gold,
-    paddingHorizontal: spacing.md, paddingVertical: 4,
-    borderRadius: radius.full, alignSelf: 'flex-start',
-    marginBottom: spacing.xs,
+    paddingHorizontal: z(spacing.md), paddingVertical: z(4),
+    borderRadius: z(radius.full), alignSelf: 'flex-start',
+    marginBottom: z(spacing.xs),
   },
   featuredBadgeText: {
-    fontSize: 11, fontWeight: '900',
-    letterSpacing: 1, color: colors.primary,
+    fontSize: z(11), fontWeight: '900',
+    letterSpacing: z(1), color: colors.primary,
   },
   cardContent: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    flexDirection: 'row', alignItems: 'center', gap: z(spacing.md),
   },
-  cardIcon: { fontSize: 40 },
-  cardInfo: { flex: 1, gap: 4 },
+  cardIcon: { fontSize: z(40) },
+  cardInfo: { flex: 1, gap: z(4) },
   tag: {
     alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm, paddingVertical: 3,
-    borderRadius: radius.full, borderWidth: 1, marginBottom: 2,
+    paddingHorizontal: z(spacing.sm), paddingVertical: z(3),
+    borderRadius: z(radius.full), borderWidth: 1, marginBottom: z(2),
   },
-  tagText: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  cardTitle: { fontSize: 19, fontWeight: '900', color: colors.white },
-  cardDescription: { fontSize: 13, color: 'rgba(255,255,255,0.55)' },
-  cardPricing: { alignItems: 'flex-end', gap: 2 },
-  perPhoto: { fontSize: 11, color: colors.gray400, letterSpacing: 1 },
-  cardPrice: { fontSize: 26, fontWeight: '900', color: colors.gold },
-  savings: { fontSize: 12, color: colors.success, fontWeight: '700' },
-  arrow: { color: colors.accentLight, fontSize: 20, textAlign: 'right' },
-  infoCard: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1, borderColor: 'rgba(144,224,239,0.15)',
-    borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm,
-  },
-  infoTitle: { fontSize: 15, fontWeight: '800', color: colors.gold, marginBottom: 4 },
-  infoItem: { fontSize: 14, color: colors.accentLight },
+  tagText: { fontSize: z(10), fontWeight: '800', letterSpacing: z(1) },
+  cardTitle: { fontSize: z(19), fontWeight: '900', color: colors.white },
+  cardDescription: { fontSize: z(13), color: 'rgba(255,255,255,0.55)' },
+  cardPricing: { alignItems: 'flex-end', gap: z(2) },
+  perPhoto: { fontSize: z(11), color: colors.gray400, letterSpacing: z(1) },
+  cardPrice: { fontSize: z(26), fontWeight: '900', color: colors.gold },
+  savings: { fontSize: z(12), color: colors.success, fontWeight: '700' },
+  arrow: { color: colors.accentLight, fontSize: z(20), textAlign: 'right' },
 });
+};

@@ -5,8 +5,11 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, radius } from '../utils/theme';
+import { useScale, useScaledStyles } from '../utils/responsive';
 
 export default function CheckoutScreen({ route, navigation }) {
+  const k = useScale();
+  const styles = useScaledStyles(createStyles);
   const { session, photoIds, photos, total, packageType, group, extras = [], extrasTotal = 0 } = route.params;
   const [loading, setLoading] = useState(false);
 
@@ -47,7 +50,7 @@ export default function CheckoutScreen({ route, navigation }) {
           <Text style={styles.dolphin}>🐬</Text>
           <Text style={styles.title}>Resumo do Pedido</Text>
         </View>
-        <View style={{ width: 100 }} />
+        <View style={{ width: Math.round(100 * k) }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -97,18 +100,6 @@ export default function CheckoutScreen({ route, navigation }) {
           </View>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.benefitsTitle}>🐬 Jangalancha Show garante:</Text>
-          {[
-            '📸 Fotos em alta resolução',
-            '🔗 Link para download no celular',
-            '📱 Compartilhamento via WhatsApp',
-            '☁️ Acesso por 30 dias na nuvem',
-          ].map((item) => (
-            <Text key={item} style={styles.feature}>{item}</Text>
-          ))}
-        </View>
-
       </ScrollView>
 
       <View style={styles.footer}>
@@ -138,60 +129,61 @@ export default function CheckoutScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (k) => {
+  const z = (n) => Math.round(n * k);
+  return StyleSheet.create({
   container: { flex: 1 },
   sun: {
-    position: 'absolute', top: -80, right: -80,
-    width: 260, height: 260, borderRadius: 130,
+    position: 'absolute', top: z(-80), right: z(-80),
+    width: z(260), height: z(260), borderRadius: z(130),
     backgroundColor: colors.gold, opacity: 0.08,
   },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
+    paddingHorizontal: z(spacing.lg), paddingTop: z(spacing.xl), paddingBottom: z(spacing.md),
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  backText: { color: colors.accentLight, fontSize: 20, fontWeight: '600' },
-  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'center' },
-  dolphin: { fontSize: 32 },
-  title: { fontSize: 24, fontWeight: '900', color: colors.white },
-  content: { padding: spacing.lg, paddingBottom: 120, gap: spacing.lg },
+  backText: { color: colors.accentLight, fontSize: z(20), fontWeight: '600' },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: z(8), flex: 1, justifyContent: 'center' },
+  dolphin: { fontSize: z(32) },
+  title: { fontSize: z(24), fontWeight: '900', color: colors.white },
+  content: { padding: z(spacing.lg), paddingBottom: z(120), gap: z(spacing.lg) },
   packageBadge: {
     backgroundColor: 'rgba(255,214,10,0.15)',
     borderWidth: 1, borderColor: 'rgba(255,214,10,0.3)',
-    borderRadius: radius.full, paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg, alignSelf: 'center',
+    borderRadius: z(radius.full), paddingVertical: z(spacing.sm),
+    paddingHorizontal: z(spacing.lg), alignSelf: 'center',
   },
-  packageBadgeText: { fontSize: 15, fontWeight: '800', color: colors.gold },
-  section: { gap: spacing.sm },
-  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 2, color: colors.gray400 },
-  thumbRow: { marginTop: spacing.xs },
+  packageBadgeText: { fontSize: z(15), fontWeight: '800', color: colors.gold },
+  section: { gap: z(spacing.sm) },
+  sectionLabel: { fontSize: z(11), fontWeight: '700', letterSpacing: z(2), color: colors.gray400 },
+  thumbRow: { marginTop: z(spacing.xs) },
   thumb: {
-    width: 88, height: 88, borderRadius: radius.sm,
-    marginRight: spacing.sm, borderWidth: 2, borderColor: colors.gold,
+    width: z(88), height: z(88), borderRadius: z(radius.sm),
+    marginRight: z(spacing.sm), borderWidth: 2, borderColor: colors.gold,
   },
   card: {
     backgroundColor: colors.cardBg,
     borderWidth: 1, borderColor: colors.cardBorder,
-    borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md,
+    borderRadius: z(radius.lg), padding: z(spacing.lg), gap: z(spacing.md),
   },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  rowLabel: { fontSize: 15, color: colors.accentLight },
-  rowValue: { fontSize: 15, color: colors.white, fontWeight: '700' },
-  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)' },
-  totalLabel: { fontSize: 18, fontWeight: '900', color: colors.white, letterSpacing: 2 },
-  totalValue: { fontSize: 28, fontWeight: '900', color: colors.gold },
-  benefitsTitle: { fontSize: 15, fontWeight: '800', color: colors.gold, marginBottom: 4 },
-  feature: { fontSize: 15, color: colors.accentLight },
+  rowLabel: { fontSize: z(15), color: colors.accentLight },
+  rowValue: { fontSize: z(15), color: colors.white, fontWeight: '700' },
+  divider: { height: z(1), backgroundColor: 'rgba(255,255,255,0.08)' },
+  totalLabel: { fontSize: z(18), fontWeight: '900', color: colors.white, letterSpacing: z(2) },
+  totalValue: { fontSize: z(28), fontWeight: '900', color: colors.gold },
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    padding: spacing.lg, backgroundColor: '#003566',
+    padding: z(spacing.lg), backgroundColor: '#003566',
     borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)',
   },
-  payBtn: { borderRadius: radius.full, overflow: 'hidden' },
+  payBtn: { borderRadius: z(radius.full), overflow: 'hidden' },
   payGrad: {
     flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', paddingVertical: spacing.lg, gap: spacing.sm,
+    justifyContent: 'center', paddingVertical: z(spacing.lg), gap: z(spacing.sm),
   },
-  payIcon: { fontSize: 20 },
-  payText: { fontSize: 19, fontWeight: '900', letterSpacing: 2, color: colors.primary },
+  payIcon: { fontSize: z(20) },
+  payText: { fontSize: z(19), fontWeight: '900', letterSpacing: z(2), color: colors.primary },
 });
+};

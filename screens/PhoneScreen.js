@@ -1,12 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  StatusBar, Animated, TextInput, ActivityIndicator,
+  StatusBar, Animated, TextInput, ActivityIndicator, ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, radius } from '../utils/theme';
+import { useScale, useScaledStyles } from '../utils/responsive';
 
 export default function PhoneScreen({ route, navigation }) {
+  const k = useScale();
+  const styles = useScaledStyles(createStyles);
   const { session, group, photoIds, photos, total, packageType, extras = [] } = route.params;
   const [phone, setPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('pix');
@@ -78,9 +81,14 @@ export default function PhoneScreen({ route, navigation }) {
           <Text style={styles.backText}>← Voltar</Text>
         </TouchableOpacity>
         <Text style={styles.headerBrand}>⛵ Jangalancha Show</Text>
-        <View style={{ width: 90 }} />
+        <View style={{ width: Math.round(90 * k) }} />
       </View>
 
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
       <Animated.View style={[styles.content, { opacity: fadeIn }]}>
 
         {/* Golfinho */}
@@ -90,7 +98,7 @@ export default function PhoneScreen({ route, navigation }) {
 
         <Text style={styles.title}>Para onde enviamos{'\n'}suas fotos?</Text>
         <Text style={styles.subtitle}>
-          Digite o celular que vai receber o link de download
+          Digite o celular que vai receber as imagens
         </Text>
 
         {/* Input */}
@@ -112,17 +120,6 @@ export default function PhoneScreen({ route, navigation }) {
             />
           </View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
-        </View>
-
-        {/* Info */}
-        <View style={styles.infoWrap}>
-          {[
-            '📱 Você receberá o link via WhatsApp',
-            '☁️ Fotos disponíveis por 30 dias',
-            '📸 Download em alta resolução',
-          ].map((item) => (
-            <Text key={item} style={styles.infoItem}>{item}</Text>
-          ))}
         </View>
 
         {/* Método de pagamento */}
@@ -179,82 +176,86 @@ export default function PhoneScreen({ route, navigation }) {
         </TouchableOpacity>
 
       </Animated.View>
+      </ScrollView>
     </LinearGradient>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (k) => {
+  const z = (n) => Math.round(n * k);
+  return StyleSheet.create({
   container: { flex: 1 },
   sun: {
-    position: 'absolute', top: -80, right: -80,
-    width: 260, height: 260, borderRadius: 130,
+    position: 'absolute', top: z(-80), right: z(-80),
+    width: z(260), height: z(260), borderRadius: z(130),
     backgroundColor: colors.gold, opacity: 0.08,
   },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
+    paddingHorizontal: z(spacing.lg), paddingTop: z(spacing.xl), paddingBottom: z(spacing.md),
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  backText: { color: colors.accentLight, fontSize: 20, fontWeight: '600' },
-  headerBrand: { fontSize: 22, fontWeight: '800', color: colors.white, letterSpacing: 1 },
+  backText: { color: colors.accentLight, fontSize: z(20), fontWeight: '600' },
+  headerBrand: { fontSize: z(22), fontWeight: '800', color: colors.white, letterSpacing: z(1) },
+  scroll: { flexGrow: 1, justifyContent: 'center', paddingVertical: z(spacing.lg) },
   content: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: spacing.xl, gap: spacing.lg,
+    alignItems: 'center', justifyContent: 'center', alignSelf: 'center',
+    width: '100%', maxWidth: z(760),
+    paddingHorizontal: z(spacing.xl), gap: z(spacing.lg),
   },
-  dolphin: { fontSize: 64 },
+  dolphin: { fontSize: z(64) },
   title: {
-    fontSize: 30, fontWeight: '900', color: colors.white,
-    textAlign: 'center', lineHeight: 38,
+    fontSize: z(30), fontWeight: '900', color: colors.white,
+    textAlign: 'center', lineHeight: z(38),
   },
   subtitle: {
-    fontSize: 15, color: colors.accentLight,
-    textAlign: 'center', lineHeight: 22,
+    fontSize: z(15), color: colors.accentLight,
+    textAlign: 'center', lineHeight: z(22),
   },
   inputCard: {
     width: '100%', backgroundColor: colors.cardBg,
     borderWidth: 1, borderColor: 'rgba(255,214,10,0.3)',
-    borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md,
+    borderRadius: z(radius.lg), padding: z(spacing.lg), gap: z(spacing.md),
   },
-  inputLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 2, color: colors.gray400 },
-  phoneRow: { flexDirection: 'row', gap: spacing.sm },
+  inputLabel: { fontSize: z(11), fontWeight: '700', letterSpacing: z(2), color: colors.gray400 },
+  phoneRow: { flexDirection: 'row', gap: z(spacing.sm) },
   ddiBox: {
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1, borderColor: 'rgba(0,180,216,0.3)',
-    borderRadius: radius.md, padding: spacing.md,
-    alignItems: 'center', justifyContent: 'center', minWidth: 64,
+    borderRadius: z(radius.md), padding: z(spacing.md),
+    alignItems: 'center', justifyContent: 'center', minWidth: z(64),
   },
-  ddiText: { fontSize: 18, color: colors.white, fontWeight: '700' },
+  ddiText: { fontSize: z(18), color: colors.white, fontWeight: '700' },
   input: {
-    flex: 1, backgroundColor: 'rgba(255,255,255,0.08)',
+    flex: 1, minWidth: 0, backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1, borderColor: 'rgba(0,180,216,0.3)',
-    borderRadius: radius.md, padding: spacing.md,
-    fontSize: 24, color: colors.white, letterSpacing: 3,
+    borderRadius: z(radius.md), padding: z(spacing.md),
+    fontSize: z(24), color: colors.white, letterSpacing: z(3),
   },
-  error: { color: colors.error, fontSize: 14, textAlign: 'center' },
-  infoWrap: { gap: spacing.sm, alignSelf: 'flex-start' },
-  infoItem: { fontSize: 14, color: colors.accentLight },
+  error: { color: colors.error, fontSize: z(14), textAlign: 'center' },
   payCard: {
     width: '100%', backgroundColor: colors.cardBg,
     borderWidth: 1, borderColor: 'rgba(255,214,10,0.3)',
-    borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm,
+    borderRadius: z(radius.lg), padding: z(spacing.lg), gap: z(spacing.sm),
   },
-  payLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 2, color: colors.gray400 },
+  payLabel: { fontSize: z(11), fontWeight: '700', letterSpacing: z(2), color: colors.gray400 },
   // Grade 2x2: quatro opcoes numa linha so ficariam apertadas em tablet estreito.
   payRow: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm,
+    flexDirection: 'row', flexWrap: 'wrap', gap: z(spacing.sm),
     justifyContent: 'space-between',
   },
   payBtn: {
-    width: '48%', paddingVertical: spacing.md, paddingHorizontal: 2,
-    alignItems: 'center', borderRadius: radius.full,
+    width: '48%', paddingVertical: z(spacing.md), paddingHorizontal: z(2),
+    alignItems: 'center', borderRadius: z(radius.full),
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
   payBtnActive: { backgroundColor: colors.gold, borderColor: colors.gold },
-  payText: { fontSize: 15, fontWeight: '700', color: colors.accentLight, letterSpacing: 0.5 },
+  payText: { fontSize: z(15), fontWeight: '700', color: colors.accentLight, letterSpacing: z(0.5) },
   payTextActive: { color: colors.primary },
-  payHint: { fontSize: 12, color: colors.gray400, textAlign: 'center', marginTop: 2 },
-  continueBtn: { width: '100%', borderRadius: radius.full, overflow: 'hidden' },
-  continueGrad: { paddingVertical: spacing.lg + 2, alignItems: 'center' },
-  continueText: { fontSize: 20, fontWeight: '900', letterSpacing: 2, color: colors.primary },
+  payHint: { fontSize: z(12), color: colors.gray400, textAlign: 'center', marginTop: z(2) },
+  continueBtn: { width: '100%', borderRadius: z(radius.full), overflow: 'hidden' },
+  continueGrad: { paddingVertical: z(spacing.lg + 2), alignItems: 'center' },
+  continueText: { fontSize: z(20), fontWeight: '900', letterSpacing: z(2), color: colors.primary },
 });
+};

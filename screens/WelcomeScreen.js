@@ -5,8 +5,10 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, radius } from '../utils/theme';
+import { useScaledStyles } from '../utils/responsive';
 
 export default function WelcomeScreen({ navigation }) {
+  const styles = useScaledStyles(createStyles);
   const pulse = useRef(new Animated.Value(1)).current;
   const fadeIn = useRef(new Animated.Value(0)).current;
   const slideUp = useRef(new Animated.Value(50)).current;
@@ -78,23 +80,15 @@ export default function WelcomeScreen({ navigation }) {
           </TouchableOpacity>
         </Animated.View>
 
-        <Text style={styles.hint}>
-          Insira o código recebido no embarque
-        </Text>
       </Animated.View>
 
-      {/* Admin link */}
-      <TouchableOpacity
-        style={styles.adminLink}
-        onPress={() => navigation.navigate('AdminLogin')}
-      >
-        <Text style={styles.adminText}>Área Administrativa</Text>
-      </TouchableOpacity>
     </ImageBackground>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (k) => {
+  const z = (n) => Math.round(n * k);
+  return StyleSheet.create({
   background: {
     flex: 1, width: '100%', height: '100%',
     alignItems: 'center', justifyContent: 'flex-end',
@@ -104,58 +98,45 @@ const styles = StyleSheet.create({
   },
 
   signature: {
-    position: 'absolute', top: spacing.xl, left: spacing.xl,
+    position: 'absolute', top: z(spacing.xl), left: z(spacing.xl),
     flexDirection: 'row', alignItems: 'baseline',
-    gap: 4, zIndex: 10,
+    gap: z(4), zIndex: 10,
   },
   signatureText: {
-    fontSize: 14, fontWeight: '900',
-    letterSpacing: 3, color: 'rgba(255,255,255,0.5)',
+    fontSize: z(14), fontWeight: '900',
+    letterSpacing: z(3), color: 'rgba(255,255,255,0.5)',
   },
   signatureAccent: {
-    fontSize: 14, fontWeight: '900',
-    letterSpacing: 3, color: 'rgba(255,214,10,0.6)',
+    fontSize: z(14), fontWeight: '900',
+    letterSpacing: z(3), color: 'rgba(255,214,10,0.6)',
   },
 
   content: {
-    width: '100%', paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxl + spacing.xl,
+    width: '100%', paddingHorizontal: z(spacing.xl),
+    paddingBottom: z(spacing.xxl + spacing.xl),
     zIndex: 5, alignItems: 'center',
   },
 
-  btnWrap: { width: '100%', marginBottom: spacing.md },
+  btnWrap: { width: '100%', marginBottom: z(spacing.md) },
   ctaButton: {
-    borderRadius: radius.full, overflow: 'hidden',
+    borderRadius: z(radius.full), overflow: 'hidden',
     shadowColor: colors.gold, shadowOpacity: 0.5,
-    shadowOffset: { width: 0, height: 6 }, shadowRadius: 16,
+    shadowOffset: { width: 0, height: z(6) }, shadowRadius: z(16),
     elevation: 10,
   },
   ctaGradient: {
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.lg + 2,
-    paddingHorizontal: spacing.xl,
-    gap: spacing.md,
+    paddingVertical: z(spacing.lg + 2),
+    paddingHorizontal: z(spacing.xl),
+    gap: z(spacing.md),
   },
   ctaText: {
-    fontSize: 20, fontWeight: '900',
-    letterSpacing: 3, color: colors.primary,
+    fontSize: z(20), fontWeight: '900',
+    letterSpacing: z(3), color: colors.primary,
   },
   ctaIcon: {
-    fontSize: 22, color: colors.primary, fontWeight: '700',
-  },
-
-  hint: {
-    fontSize: 13, color: 'rgba(255,255,255,0.4)',
-    textAlign: 'center', letterSpacing: 0.3,
-  },
-
-  adminLink: {
-    position: 'absolute', bottom: spacing.lg,
-    zIndex: 10, alignSelf: 'center',
-  },
-  adminText: {
-    fontSize: 12, color: 'rgba(255,255,255,0.2)',
-    letterSpacing: 1,
+    fontSize: z(22), color: colors.primary, fontWeight: '700',
   },
 });
+};

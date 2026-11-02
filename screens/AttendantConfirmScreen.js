@@ -9,18 +9,21 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  ActivityIndicator, StatusBar, KeyboardAvoidingView, Platform,
+  ActivityIndicator, StatusBar, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { infinitePayService, mensagemDeErro } from '../services/infinitepay';
+import { paymentService, mensagemDeErro } from '../services/payments';
 import { ROTULO_METODO } from './CallAttendantScreen';
 import { colors, spacing, radius } from '../utils/theme';
+import { useScale, useScaledStyles } from '../utils/responsive';
 
 // Erros em que tentar de novo com este pedido nao adianta.
 const ERROS_FINAIS = ['PAGAMENTO_EXPIRADO', 'PAGAMENTO_ENCERRADO', 'TENTATIVAS_EXCEDIDAS', 'PAGAMENTO_NAO_ENCONTRADO'];
 
 export default function AttendantConfirmScreen({ route, navigation }) {
+  const k = useScale();
+  const styles = useScaledStyles(createStyles);
   const { intent, photos, clientPhone, paymentMethod } = route.params;
 
   const [senha, setSenha] = useState('');
@@ -62,7 +65,7 @@ export default function AttendantConfirmScreen({ route, navigation }) {
     setErro('');
 
     try {
-      const r = await infinitePayService.confirmarAtendente({
+      const r = await paymentService.confirmarAtendente({
         orderNsu: intent.orderNsu,
         password: senha,
       });
@@ -96,12 +99,17 @@ export default function AttendantConfirmScreen({ route, navigation }) {
           <Text style={styles.backText}>← Voltar</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Área do atendente</Text>
-        <View style={{ width: 90 }} />
+        <View style={{ width: Math.round(90 * k) }} />
       </View>
 
       <KeyboardAvoidingView
-        style={styles.content}
+        style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         <Text style={styles.lock}>🔐</Text>
         <Text style={styles.title}>Confirmar pagamento</Text>
@@ -158,55 +166,61 @@ export default function AttendantConfirmScreen({ route, navigation }) {
             </LinearGradient>
           </TouchableOpacity>
         )}
+      </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (k) => {
+  const z = (n) => Math.round(n * k);
+  return StyleSheet.create({
   container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
+    paddingHorizontal: z(spacing.lg), paddingTop: z(spacing.xl), paddingBottom: z(spacing.md),
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  backText: { color: colors.accentLight, fontSize: 20, fontWeight: '600' },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: colors.white, letterSpacing: 1 },
+  backText: { color: colors.accentLight, fontSize: z(20), fontWeight: '600' },
+  headerTitle: { fontSize: z(24), fontWeight: '800', color: colors.white, letterSpacing: z(1) },
+  flex: { flex: 1 },
   content: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: spacing.xl, gap: spacing.lg,
+    flexGrow: 1, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: z(spacing.lg),
+    paddingHorizontal: z(spacing.xl), gap: z(spacing.lg),
   },
-  lock: { fontSize: 56 },
-  title: { fontSize: 28, fontWeight: '900', color: colors.white, textAlign: 'center' },
+  lock: { fontSize: z(56) },
+  title: { fontSize: z(28), fontWeight: '900', color: colors.white, textAlign: 'center' },
   amountCard: {
     backgroundColor: 'rgba(255,214,10,0.12)',
-    borderRadius: radius.lg, borderWidth: 1, borderColor: 'rgba(255,214,10,0.3)',
-    paddingVertical: spacing.md, paddingHorizontal: spacing.xl,
+    borderRadius: z(radius.lg), borderWidth: 1, borderColor: 'rgba(255,214,10,0.3)',
+    paddingVertical: z(spacing.md), paddingHorizontal: z(spacing.xl),
     alignItems: 'center', width: '100%',
   },
-  amountLabel: { fontSize: 11, letterSpacing: 2, color: colors.gray400, fontWeight: '700' },
-  amount: { fontSize: 40, fontWeight: '900', color: colors.gold },
-  amountSub: { fontSize: 15, color: colors.white, fontWeight: '700' },
-  photosInfo: { fontSize: 13, color: colors.accentLight, marginTop: 4 },
+  amountLabel: { fontSize: z(11), letterSpacing: z(2), color: colors.gray400, fontWeight: '700' },
+  amount: { fontSize: z(40), fontWeight: '900', color: colors.gold },
+  amountSub: { fontSize: z(15), color: colors.white, fontWeight: '700' },
+  photosInfo: { fontSize: z(13), color: colors.accentLight, marginTop: z(4) },
   inputCard: {
     width: '100%', backgroundColor: colors.cardBg,
     borderWidth: 1, borderColor: 'rgba(255,214,10,0.3)',
-    borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md,
+    borderRadius: z(radius.lg), padding: z(spacing.lg), gap: z(spacing.md),
   },
-  inputLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 2, color: colors.gray400 },
+  inputLabel: { fontSize: z(11), fontWeight: '700', letterSpacing: z(2), color: colors.gray400 },
   input: {
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1, borderColor: 'rgba(0,180,216,0.3)',
-    borderRadius: radius.md, padding: spacing.md,
-    fontSize: 24, color: colors.white, letterSpacing: 4, textAlign: 'center',
+    borderRadius: z(radius.md), padding: z(spacing.md),
+    fontSize: z(24), color: colors.white, letterSpacing: z(4), textAlign: 'center',
   },
-  error: { color: colors.error, fontSize: 14, textAlign: 'center' },
-  confirmBtn: { width: '100%', borderRadius: radius.full, overflow: 'hidden' },
-  confirmGrad: { paddingVertical: spacing.lg, alignItems: 'center' },
-  confirmText: { fontSize: 17, fontWeight: '900', letterSpacing: 1, color: colors.white },
+  error: { color: colors.error, fontSize: z(14), textAlign: 'center' },
+  confirmBtn: { width: '100%', borderRadius: z(radius.full), overflow: 'hidden' },
+  confirmGrad: { paddingVertical: z(spacing.lg), alignItems: 'center' },
+  confirmText: { fontSize: z(17), fontWeight: '900', letterSpacing: z(1), color: colors.white },
   outlineBtn: {
-    width: '100%', paddingVertical: spacing.lg, alignItems: 'center',
-    borderRadius: radius.full, borderWidth: 2, borderColor: 'rgba(255,214,10,0.4)',
+    width: '100%', paddingVertical: z(spacing.lg), alignItems: 'center',
+    borderRadius: z(radius.full), borderWidth: 2, borderColor: 'rgba(255,214,10,0.4)',
   },
-  outlineText: { fontSize: 18, fontWeight: '700', color: colors.gold },
+  outlineText: { fontSize: z(18), fontWeight: '700', color: colors.gold },
 });
+};

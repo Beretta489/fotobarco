@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Image, ActivityIndicator, StatusBar, Dimensions, Modal,
+  Image, ActivityIndicator, StatusBar, Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { photosService } from '../services/photos';
 import { colors, spacing, radius } from '../utils/theme';
+import { useScale, useScaledStyles } from '../utils/responsive';
 
-const { width, height } = Dimensions.get('window');
 const COLS = 3;
-const PHOTO_SIZE = (width - spacing.lg * 2 - spacing.sm * (COLS - 1)) / COLS;
 
 export default function PhotoGalleryScreen({ route, navigation }) {
+  const k = useScale();
+  const styles = useScaledStyles(createStyles);
   const { session, group } = route.params;
   const insets = useSafeAreaInsets();
   const [photos, setPhotos] = useState([]);
@@ -67,7 +68,7 @@ export default function PhotoGalleryScreen({ route, navigation }) {
               <Text style={styles.photoCount}>{photos.length} fotos do seu passeio</Text>
             </View>
           </View>
-          <View style={{ width: 90 }} />
+          <View style={{ width: Math.round(90 * k) }} />
         </View>
 
         <View style={styles.instructionBar}>
@@ -117,7 +118,7 @@ export default function PhotoGalleryScreen({ route, navigation }) {
                 ))}
               </View>
             ))}
-            <View style={{ height: 40 }} />
+            <View style={{ height: Math.round(40 * k) }} />
           </ScrollView>
         )}
 
@@ -192,93 +193,97 @@ export default function PhotoGalleryScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (k, width, height) => {
+  const z = (n) => Math.round(n * k);
+  const PHOTO_SIZE = Math.floor((width - z(spacing.lg) * 2 - z(spacing.sm) * (COLS - 1)) / COLS) - 1;
+  return StyleSheet.create({
   container: { flex: 1 },
   gradient: { flex: 1 },
   sun: {
-    position: 'absolute', top: -80, right: -80,
-    width: 260, height: 260, borderRadius: 130,
+    position: 'absolute', top: z(-80), right: z(-80),
+    width: z(260), height: z(260), borderRadius: z(130),
     backgroundColor: colors.gold, opacity: 0.08,
   },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
+    paddingHorizontal: z(spacing.lg), paddingTop: z(spacing.xl), paddingBottom: z(spacing.md),
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  backText: { color: colors.accentLight, fontSize: 20, fontWeight: '600' },
-  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, justifyContent: 'center' },
-  dolphin: { fontSize: 32 },
-  sessionName: { fontSize: 24, fontWeight: '900', color: colors.white },
-  photoCount: { fontSize: 15, color: colors.gray400 },
+  backText: { color: colors.accentLight, fontSize: z(20), fontWeight: '600' },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: z(spacing.sm), flex: 1, justifyContent: 'center' },
+  dolphin: { fontSize: z(32) },
+  sessionName: { fontSize: z(24), fontWeight: '900', color: colors.white },
+  photoCount: { fontSize: z(15), color: colors.gray400 },
   instructionBar: {
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.sm,
+    paddingHorizontal: z(spacing.lg), paddingVertical: z(spacing.sm),
     backgroundColor: 'rgba(255,214,10,0.08)',
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,214,10,0.15)',
   },
-  instructionText: { fontSize: 13, color: colors.gold, textAlign: 'center', fontWeight: '600' },
-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-  loadingText: { color: colors.gold, fontSize: 16, fontWeight: '600' },
-  errorText: { color: colors.error, fontSize: 16, textAlign: 'center' },
-  emptyText: { color: colors.accentLight, fontSize: 16, textAlign: 'center', lineHeight: 26 },
+  instructionText: { fontSize: z(13), color: colors.gold, textAlign: 'center', fontWeight: '600' },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: z(spacing.md) },
+  loadingText: { color: colors.gold, fontSize: z(16), fontWeight: '600' },
+  errorText: { color: colors.error, fontSize: z(16), textAlign: 'center' },
+  emptyText: { color: colors.accentLight, fontSize: z(16), textAlign: 'center', lineHeight: z(26) },
   retryBtn: {
-    paddingVertical: spacing.md, paddingHorizontal: spacing.xl,
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.accentLight,
+    paddingVertical: z(spacing.md), paddingHorizontal: z(spacing.xl),
+    borderRadius: z(radius.full), borderWidth: 1, borderColor: colors.accentLight,
   },
-  retryText: { color: colors.accentLight, fontSize: 15, fontWeight: '600' },
+  retryText: { color: colors.accentLight, fontSize: z(15), fontWeight: '600' },
   scrollView: { flex: 1 },
-  grid: { padding: spacing.lg },
-  row: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  grid: { padding: z(spacing.lg) },
+  row: { flexDirection: 'row', gap: z(spacing.sm), marginBottom: z(spacing.sm) },
   photoWrap: {
     width: PHOTO_SIZE, height: PHOTO_SIZE * 1.1,
-    borderRadius: radius.sm, overflow: 'hidden',
+    borderRadius: z(radius.sm), overflow: 'hidden',
     borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)',
   },
   photo: { width: '100%', height: '100%' },
   zoomHint: {
-    position: 'absolute', bottom: 6, right: 6,
-    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 12, padding: 4,
+    position: 'absolute', bottom: z(6), right: z(6),
+    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: z(12), padding: z(4),
   },
-  zoomIcon: { fontSize: 12 },
+  zoomIcon: { fontSize: z(12) },
   bottomBar: {
-    padding: spacing.lg, borderTopWidth: 1, flexShrink: 0,
+    padding: z(spacing.lg), borderTopWidth: 1, flexShrink: 0,
     borderTopColor: 'rgba(255,255,255,0.08)', backgroundColor: '#003566',
   },
-  ctaBtn: { borderRadius: radius.full, overflow: 'hidden' },
-  ctaGrad: { paddingVertical: spacing.lg, alignItems: 'center' },
-  ctaText: { fontSize: 17, fontWeight: '900', letterSpacing: 2, color: colors.primary },
+  ctaBtn: { borderRadius: z(radius.full), overflow: 'hidden' },
+  ctaGrad: { paddingVertical: z(spacing.lg), alignItems: 'center' },
+  ctaText: { fontSize: z(17), fontWeight: '900', letterSpacing: z(2), color: colors.primary },
   modalOverlay: {
     flex: 1, backgroundColor: 'rgba(0,20,50,0.97)',
-    alignItems: 'center', justifyContent: 'center', padding: spacing.lg,
+    alignItems: 'center', justifyContent: 'center', padding: z(spacing.lg),
   },
   closeBtn: {
-    position: 'absolute', top: spacing.xl, right: spacing.xl,
-    width: 44, height: 44, borderRadius: 22,
+    position: 'absolute', top: z(spacing.xl), right: z(spacing.xl),
+    width: z(44), height: z(44), borderRadius: z(22),
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center', justifyContent: 'center', zIndex: 10,
   },
-  closeBtnText: { color: colors.white, fontSize: 20, fontWeight: '700' },
+  closeBtnText: { color: colors.white, fontSize: z(20), fontWeight: '700' },
   photoCounter: {
-    position: 'absolute', top: spacing.xl + 8,
+    position: 'absolute', top: z(spacing.xl + 8),
     left: 0, right: 0, textAlign: 'center',
-    color: colors.gold, fontSize: 15, fontWeight: '700',
+    color: colors.gold, fontSize: z(15), fontWeight: '700',
   },
   navRow: {
     flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: spacing.md, width: '100%',
+    justifyContent: 'center', gap: z(spacing.md), width: '100%',
   },
   navBtn: {
-    width: 52, height: 52, borderRadius: 26,
+    width: z(52), height: z(52), borderRadius: z(26),
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
   navBtnDisabled: { opacity: 0.2 },
-  navBtnText: { color: colors.white, fontSize: 32, fontWeight: '300' },
-  previewImage: { width: width * 0.82, height: height * 0.75, borderRadius: radius.lg },
+  navBtnText: { color: colors.white, fontSize: z(32), fontWeight: '300' },
+  previewImage: { width: width * 0.82, height: height * 0.75, borderRadius: z(radius.lg) },
   closePreviewBtn: {
-    marginTop: spacing.lg, paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl, borderRadius: radius.full,
+    marginTop: z(spacing.lg), paddingVertical: z(spacing.md),
+    paddingHorizontal: z(spacing.xl), borderRadius: z(radius.full),
     borderWidth: 2, borderColor: 'rgba(255,214,10,0.4)',
   },
-  closePreviewText: { color: colors.gold, fontSize: 16, fontWeight: '700' },
+  closePreviewText: { color: colors.gold, fontSize: z(16), fontWeight: '700' },
 });
+};

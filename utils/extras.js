@@ -1,6 +1,10 @@
 // Catálogo de itens extras (bebidas e lembranças) vendidos no passeio.
 // Para mudar preços ou adicionar/remover itens, edite apenas esta lista —
 // a tela de Extras é gerada automaticamente a partir daqui.
+//
+// ATENÇÃO: o valor COBRADO vem da tabela extras_pricing do banco (o servidor
+// recalcula pelo id). O preço daqui é só o que aparece na tela, e precisa
+// bater com o do banco para o mesmo id.
 
 export const EXTRAS_CATALOG = [
   {
@@ -20,10 +24,9 @@ export const EXTRAS_CATALOG = [
     title: 'Lembranças',
     icon: '🐚',
     items: [
-      { id: 'brincos-concha', name: 'Brincos concha', price: 35.0, emoji: '🐚' },
-      { id: 'porta-caneta-ancora', name: 'Porta caneta âncora', price: 35.0, emoji: '⚓' },
-      { id: 'porta-caneta-barco-tartaruga', name: 'Porta caneta barco/tartaruga', price: 35.0, emoji: '🐢' },
-      { id: 'porta-caneta-conchas', name: 'Porta caneta conchas', price: 30.0, emoji: '🦪' },
+      { id: 'brincos-concha', name: 'Brinco', price: 40.0, emoji: '🐚' },
+      { id: 'porta-caneta-ancora', name: 'Porta-canetas', price: 40.0, emoji: '⚓' },
+      { id: 'chaveiro', name: 'Chaveiro', price: 10.0, emoji: '🔑' },
     ],
   },
 ];

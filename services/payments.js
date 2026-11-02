@@ -70,14 +70,13 @@ async function callFunction(name, payload, { timeoutMs = 20000 } = {}) {
   return data;
 }
 
-// O nome ficou por compatibilidade: o servico agora fala com qualquer provedor
-// Pix configurado no servidor (Efi ou InfinitePay, secret PIX_PROVIDER). O app
-// nao sabe -- nem precisa saber -- qual e.
-export const infinitePayService = {
+// O provedor Pix (Efi) e o ambiente ficam so no servidor. O app nao sabe --
+// nem precisa saber -- qual e.
+export const paymentService = {
   /**
    * Abre uma cobranca e devolve o que a tela precisa.
    *
-   * Pix -> { checkoutUrl }   credit/debit/cash -> so o valor e o orderNsu
+   * Pix -> { pixCopiaECola }   credit/debit/cash -> so o valor e o orderNsu
    *
    * Repare que NAO existe parametro de valor. O servidor recalcula o preco a
    * partir do catalogo dele -- se um dia alguem adicionar `total` aqui, a
@@ -101,7 +100,7 @@ export const infinitePayService = {
       extras: extras.map((e) => ({ id: e.id, quantity: e.quantity })),
       clientPhone,
       paymentMethod,
-    }, { timeoutMs: 30000 });   // Pix cria link no provedor: pode demorar mais
+    }, { timeoutMs: 30000 });   // Pix cria a cobranca no Efi: pode demorar mais
   },
 
   /**
@@ -118,8 +117,8 @@ export const infinitePayService = {
   /**
    * Pergunta ao servidor se o Pix ja caiu.
    *
-   * Quem confirma o Pix e o webhook da InfinitePay; esta chamada so le o
-   * resultado. Devolve { status: 'pending' | 'paid' | 'expired' }.
+   * O servidor le o banco e, com freio, consulta a cobranca no Efi.
+   * Devolve { status: 'pending' | 'paid' | 'expired' }.
    *
    * Esta funcao NAO confirma pagamento. Para o caso do webhook nao chegar, a
    * liberacao manual e recuperarPix() -- que exige admin logado.
@@ -142,17 +141,16 @@ export const infinitePayService = {
   /**
    * Libera na mao um Pix que o webhook nao confirmou.
    *
-   * Uso: o cliente mostra o comprovante no celular dele, o operador digita o
-   * NSU da transacao. O servidor pergunta a InfinitePay se aquela transacao
-   * existe e se o valor bate -- exatamente como no fluxo automatico. A unica
-   * coisa que muda e a janela de tempo aceita.
+   * O servidor consulta a cobranca no Efi e libera se estiver paga com o
+   * valor certo -- exatamente como no fluxo automatico. A unica coisa que
+   * muda e a janela de tempo aceita.
    *
    * SO FUNCIONA COM ADMIN LOGADO. A function recusa a anon key do tablet: como
    * essa chave esta dentro do APK, aceita-la aqui daria a qualquer pessoa o
    * poder de liberar um pedido vencido.
    */
-  async recuperarPix({ orderNsu, transactionNsu }) {
-    return callFunction('payment-recover', { orderNsu, transactionNsu });
+  async recuperarPix({ orderNsu }) {
+    return callFunction('payment-recover', { orderNsu });
   },
 
   /**
@@ -188,7 +186,7 @@ export function mensagemDeErro(code) {
     VALOR_DIVERGENTE:
       'O valor pago nao confere com o pedido. Chame o responsavel.',
     TRANSACAO_JA_UTILIZADA:
-      'Este comprovante ja foi usado em outro pedido.',
+      'Este pagamento ja foi usado em outro pedido.',
     TENTATIVAS_EXCEDIDAS:
       'Muitas tentativas. Refaca o pedido.',
     NAO_FOI_POSSIVEL_CALCULAR_O_VALOR:
@@ -211,8 +209,6 @@ export function mensagemDeErro(code) {
     // --- recuperacao manual do Pix (payment-recover) ---------------------
     NAO_AUTORIZADO:
       'Sessao de admin expirada. Entre de novo no painel para liberar.',
-    NSU_AUSENTE:
-      'Digite o NSU que aparece no comprovante do cliente.',
   };
   return mapa[code] || 'Nao foi possivel concluir o pagamento. Tente novamente.';
 }

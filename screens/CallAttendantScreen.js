@@ -12,11 +12,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ActivityIndicator, StatusBar, Animated,
+  ActivityIndicator, StatusBar, Animated, ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { infinitePayService, mensagemDeErro } from '../services/infinitepay';
+import { paymentService, mensagemDeErro } from '../services/payments';
 import { colors, spacing, radius } from '../utils/theme';
+import { useScale, useScaledStyles } from '../utils/responsive';
 
 export const ROTULO_METODO = {
   credit: '💳 Cartão de crédito',
@@ -25,6 +26,8 @@ export const ROTULO_METODO = {
 };
 
 export default function CallAttendantScreen({ route, navigation }) {
+  const k = useScale();
+  const styles = useScaledStyles(createStyles);
   const {
     session, group, photoIds, photos, packageType,
     extras = [], clientPhone, paymentMethod, totalEstimado = 0,
@@ -57,7 +60,7 @@ export default function CallAttendantScreen({ route, navigation }) {
     setCriando(true);
 
     try {
-      const resposta = await infinitePayService.createIntent({
+      const resposta = await paymentService.createIntent({
         sessionId: session.id,
         groupId: group?.id,
         packageType,
@@ -106,10 +109,10 @@ export default function CallAttendantScreen({ route, navigation }) {
           <Text style={styles.dolphin}>🐬</Text>
           <Text style={styles.title}>Pagamento</Text>
         </View>
-        <View style={{ width: 90 }} />
+        <View style={{ width: Math.round(90 * k) }} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Animated.Text style={[styles.bell, { transform: [{ scale: pulse }] }]}>
           🙋
         </Animated.Text>
@@ -157,66 +160,70 @@ export default function CallAttendantScreen({ route, navigation }) {
             </LinearGradient>
           </TouchableOpacity>
         )}
-      </View>
+      </ScrollView>
     </LinearGradient>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (k) => {
+  const z = (n) => Math.round(n * k);
+  return StyleSheet.create({
   container: { flex: 1 },
   sun: {
-    position: 'absolute', top: -80, right: -80,
-    width: 260, height: 260, borderRadius: 130,
+    position: 'absolute', top: z(-80), right: z(-80),
+    width: z(260), height: z(260), borderRadius: z(130),
     backgroundColor: colors.gold, opacity: 0.08,
   },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
+    paddingHorizontal: z(spacing.lg), paddingTop: z(spacing.xl), paddingBottom: z(spacing.md),
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  backText: { color: colors.accentLight, fontSize: 20, fontWeight: '600' },
-  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'center' },
-  dolphin: { fontSize: 32 },
-  title: { fontSize: 24, fontWeight: '900', color: colors.white },
+  backText: { color: colors.accentLight, fontSize: z(20), fontWeight: '600' },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: z(8), flex: 1, justifyContent: 'center' },
+  dolphin: { fontSize: z(32) },
+  title: { fontSize: z(24), fontWeight: '900', color: colors.white },
   content: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: spacing.xl, gap: spacing.lg,
+    flexGrow: 1, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: z(spacing.lg),
+    paddingHorizontal: z(spacing.xl), gap: z(spacing.lg),
   },
-  bell: { fontSize: 88 },
-  callTitle: { fontSize: 34, fontWeight: '900', color: colors.white, textAlign: 'center' },
+  bell: { fontSize: z(88) },
+  callTitle: { fontSize: z(34), fontWeight: '900', color: colors.white, textAlign: 'center' },
   callSubtitle: {
-    fontSize: 17, color: colors.accentLight,
-    textAlign: 'center', lineHeight: 24,
+    fontSize: z(17), color: colors.accentLight,
+    textAlign: 'center', lineHeight: z(24),
   },
   amountCard: {
     backgroundColor: 'rgba(255,214,10,0.12)',
-    borderRadius: radius.lg, borderWidth: 1, borderColor: 'rgba(255,214,10,0.3)',
-    paddingVertical: spacing.md, paddingHorizontal: spacing.xl,
+    borderRadius: z(radius.lg), borderWidth: 1, borderColor: 'rgba(255,214,10,0.3)',
+    paddingVertical: z(spacing.md), paddingHorizontal: z(spacing.xl),
     alignItems: 'center', width: '100%',
   },
-  amountLabel: { fontSize: 11, letterSpacing: 2, color: colors.gray400, fontWeight: '700' },
-  amount: { fontSize: 42, fontWeight: '900', color: colors.gold },
-  amountSub: { fontSize: 15, color: colors.white, marginTop: 2, fontWeight: '700' },
+  amountLabel: { fontSize: z(11), letterSpacing: z(2), color: colors.gray400, fontWeight: '700' },
+  amount: { fontSize: z(42), fontWeight: '900', color: colors.gold },
+  amountSub: { fontSize: z(15), color: colors.white, marginTop: z(2), fontWeight: '700' },
   box: {
-    alignItems: 'center', gap: spacing.sm,
+    alignItems: 'center', gap: z(spacing.sm),
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: radius.lg, padding: spacing.lg,
+    borderRadius: z(radius.lg), padding: z(spacing.lg),
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', width: '100%',
   },
-  boxText: { fontSize: 14, color: colors.accentLight, textAlign: 'center' },
+  boxText: { fontSize: z(14), color: colors.accentLight, textAlign: 'center' },
   errorBox: {
     width: '100%', backgroundColor: 'rgba(255,71,87,0.1)',
     borderColor: 'rgba(255,71,87,0.3)', borderWidth: 1,
-    borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md, alignItems: 'center',
+    borderRadius: z(radius.lg), padding: z(spacing.lg), gap: z(spacing.md), alignItems: 'center',
   },
-  errorText: { color: colors.error, fontSize: 15, textAlign: 'center' },
+  errorText: { color: colors.error, fontSize: z(15), textAlign: 'center' },
   retryBtn: {
-    backgroundColor: colors.gold, borderRadius: radius.full,
-    paddingVertical: spacing.sm, paddingHorizontal: spacing.lg,
+    backgroundColor: colors.gold, borderRadius: z(radius.full),
+    paddingVertical: z(spacing.sm), paddingHorizontal: z(spacing.lg),
   },
   retryText: { color: colors.primary, fontWeight: '800' },
-  attendantBtn: { width: '100%', borderRadius: radius.lg, overflow: 'hidden', marginTop: spacing.md },
-  attendantGrad: { paddingVertical: spacing.lg, alignItems: 'center', gap: 4 },
-  attendantText: { fontSize: 22, fontWeight: '900', letterSpacing: 2, color: colors.primary },
-  attendantSub: { fontSize: 14, fontWeight: '600', color: colors.primary },
+  attendantBtn: { width: '100%', borderRadius: z(radius.lg), overflow: 'hidden', marginTop: z(spacing.md) },
+  attendantGrad: { paddingVertical: z(spacing.lg), alignItems: 'center', gap: z(4) },
+  attendantText: { fontSize: z(22), fontWeight: '900', letterSpacing: z(2), color: colors.primary },
+  attendantSub: { fontSize: z(14), fontWeight: '600', color: colors.primary },
 });
+};

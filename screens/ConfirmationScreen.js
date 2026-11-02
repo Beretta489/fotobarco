@@ -1,12 +1,20 @@
 import React, { useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, Image, Animated, StatusBar, Linking,
+  ScrollView, Image, Animated, StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, radius } from '../utils/theme';
+import { useScaledStyles } from '../utils/responsive';
+
+function formatarTelefone(t) {
+  const d = String(t).replace(/D/g, '');
+  if (d.length < 10) return d;
+  return `(${d.slice(0, 2)}) ${d.slice(2, d.length - 4)}-${d.slice(-4)}`;
+}
 
 export default function ConfirmationScreen({ route, navigation }) {
+  const styles = useScaledStyles(createStyles);
   const { order, photos } = route.params;
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -27,13 +35,6 @@ export default function ConfirmationScreen({ route, navigation }) {
     bounceLoop.start();
     return () => bounceLoop.stop();
   }, []);
-
-  const downloadLink = `https://jangadashow.com.br/fotos/${order.download_token}`;
-
-  const handleWhatsApp = () => {
-    const msg = `🐬 Jangada Show\n\nSuas fotos do passeio estão prontas!\n\nAcesse: ${downloadLink}`;
-    Linking.openURL(`whatsapp://send?text=${encodeURIComponent(msg)}`);
-  };
 
   return (
     <LinearGradient
@@ -65,7 +66,7 @@ export default function ConfirmationScreen({ route, navigation }) {
           <Text style={styles.title}>Pagamento Confirmado!</Text>
           <Text style={styles.subtitle}>
             Obrigado por escolher a Jangada Show!{'\n'}
-            Suas fotos estão prontas 🌊
+            Suas fotos estão a caminho 🌊
           </Text>
 
           {/* Thumbnails */}
@@ -75,29 +76,14 @@ export default function ConfirmationScreen({ route, navigation }) {
             ))}
           </ScrollView>
 
-          {/* Link */}
+          {/* Aviso de envio */}
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>🔗 SEU LINK DE DOWNLOAD</Text>
-            <Text style={styles.downloadLink}>{downloadLink}</Text>
-            <View style={styles.expiryRow}>
-              <Text style={styles.expiry}>⏰ Disponível por 30 dias</Text>
-            </View>
+            <Text style={styles.cardIcon}>📱</Text>
+            <Text style={styles.cardTitle}>Suas fotos serão enviadas por WhatsApp</Text>
+            {order.client_phone ? (
+              <Text style={styles.cardText}>para o número {formatarTelefone(order.client_phone)}</Text>
+            ) : null}
           </View>
-
-          {/* WhatsApp */}
-          <TouchableOpacity
-            style={styles.whatsappBtn}
-            onPress={handleWhatsApp}
-            activeOpacity={0.85}
-          >
-            <LinearGradient
-              colors={['#25D366', '#128C7E']}
-              style={styles.btnGrad}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            >
-              <Text style={styles.btnText}>📱 Enviar link via WhatsApp</Text>
-            </LinearGradient>
-          </TouchableOpacity>
 
           {/* Voltar */}
           <TouchableOpacity
@@ -117,69 +103,64 @@ export default function ConfirmationScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (k) => {
+  const z = (n) => Math.round(n * k);
+  return StyleSheet.create({
   container: { flex: 1 },
   sun: {
-    position: 'absolute', top: -80, right: -80,
-    width: 260, height: 260, borderRadius: 130,
+    position: 'absolute', top: z(-80), right: z(-80),
+    width: z(260), height: z(260), borderRadius: z(130),
     backgroundColor: colors.gold, opacity: 0.08,
   },
   content: {
-    alignItems: 'center', padding: spacing.xl,
-    paddingTop: spacing.xxl, gap: spacing.lg,
+    alignItems: 'center', padding: z(spacing.xl),
+    paddingTop: z(spacing.xxl), gap: z(spacing.lg),
   },
-  dolphin: { fontSize: 56 },
-  successWrap: { marginBottom: spacing.xs },
+  dolphin: { fontSize: z(56) },
+  successWrap: { marginBottom: z(spacing.xs) },
   successCircle: {
-    width: 90, height: 90, borderRadius: 45,
+    width: z(90), height: z(90), borderRadius: z(45),
     alignItems: 'center', justifyContent: 'center',
     shadowColor: colors.success, shadowOpacity: 0.5,
-    shadowOffset: { width: 0, height: 8 }, shadowRadius: 20,
+    shadowOffset: { width: 0, height: z(8) }, shadowRadius: z(20),
     elevation: 12,
   },
-  successIcon: { fontSize: 48, color: colors.white, fontWeight: '900' },
-  textWrap: { alignItems: 'center', width: '100%', gap: spacing.lg },
+  successIcon: { fontSize: z(48), color: colors.white, fontWeight: '900' },
+  textWrap: { alignItems: 'center', width: '100%', gap: z(spacing.lg) },
   title: {
-    fontSize: 30, fontWeight: '900', color: colors.white,
+    fontSize: z(30), fontWeight: '900', color: colors.white,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16, color: colors.accentLight,
-    textAlign: 'center', lineHeight: 24,
+    fontSize: z(16), color: colors.accentLight,
+    textAlign: 'center', lineHeight: z(24),
   },
   thumbRow: { width: '100%' },
   thumb: {
-    width: 90, height: 90, borderRadius: radius.sm,
-    marginRight: spacing.sm, borderWidth: 2, borderColor: colors.gold,
+    width: z(90), height: z(90), borderRadius: z(radius.sm),
+    marginRight: z(spacing.sm), borderWidth: 2, borderColor: colors.gold,
   },
   card: {
     width: '100%', backgroundColor: colors.cardBg,
     borderWidth: 1, borderColor: colors.cardBorder,
-    borderRadius: radius.lg, padding: spacing.lg,
-    gap: spacing.sm, alignItems: 'center',
+    borderRadius: z(radius.lg), padding: z(spacing.lg),
+    gap: z(spacing.sm), alignItems: 'center',
   },
-  cardLabel: {
-    fontSize: 11, letterSpacing: 2,
-    color: colors.gold, fontWeight: '800',
+  cardIcon: { fontSize: z(44) },
+  cardTitle: {
+    fontSize: z(22), fontWeight: '900', color: colors.white, textAlign: 'center',
   },
-  downloadLink: {
-    fontSize: 13, color: colors.accentLight,
-    textAlign: 'center', lineHeight: 20,
-  },
-  expiryRow: { flexDirection: 'row', alignItems: 'center' },
-  expiry: { fontSize: 13, color: colors.gray400 },
-  whatsappBtn: { width: '100%', borderRadius: radius.full, overflow: 'hidden' },
-  btnGrad: { paddingVertical: spacing.lg, alignItems: 'center' },
-  btnText: { fontSize: 18, fontWeight: '800', color: colors.white },
+  cardText: { fontSize: z(17), color: colors.accentLight, textAlign: 'center' },
   newBtn: {
-    width: '100%', paddingVertical: spacing.lg, alignItems: 'center',
-    borderRadius: radius.full, borderWidth: 2,
+    width: '100%', paddingVertical: z(spacing.lg), alignItems: 'center',
+    borderRadius: z(radius.full), borderWidth: 2,
     borderColor: 'rgba(255,214,10,0.4)',
   },
-  newBtnText: { fontSize: 18, fontWeight: '700', color: colors.gold },
+  newBtnText: { fontSize: z(18), fontWeight: '700', color: colors.gold },
   thanks: {
-    fontSize: 13, color: 'rgba(255,255,255,0.3)',
-    textAlign: 'center', letterSpacing: 1,
-    marginTop: spacing.sm, marginBottom: spacing.xl,
+    fontSize: z(13), color: 'rgba(255,255,255,0.3)',
+    textAlign: 'center', letterSpacing: z(1),
+    marginTop: z(spacing.sm), marginBottom: z(spacing.xl),
   },
 });
+};

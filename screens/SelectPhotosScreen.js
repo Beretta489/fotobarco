@@ -1,17 +1,18 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable,
-  Image, StatusBar, Dimensions, Modal,
+  Image, StatusBar, Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, radius } from '../utils/theme';
+import { useScale, useScaledStyles } from '../utils/responsive';
 
-const { width, height } = Dimensions.get('window');
 const COLS = 3;
-const PHOTO_SIZE = (width - spacing.lg * 2 - spacing.sm * (COLS - 1)) / COLS;
 const PRICE_PER_PHOTO = 15.00;
 
 export default function SelectPhotosScreen({ route, navigation }) {
+  const k = useScale();
+  const styles = useScaledStyles(createStyles);
   const { session, photos, maxSelect, total, packageType, group } = route.params;
   const [selected, setSelected] = useState(new Set());
   const [previewPhoto, setPreviewPhoto] = useState(null);
@@ -72,7 +73,7 @@ export default function SelectPhotosScreen({ route, navigation }) {
               </Text>
             </View>
           </View>
-          <View style={{ width: 90 }} />
+          <View style={{ width: Math.round(90 * k) }} />
         </View>
 
         {isHalf && (
@@ -137,7 +138,7 @@ export default function SelectPhotosScreen({ route, navigation }) {
               })}
             </View>
           ))}
-          <View style={{ height: 120 }} />
+          <View style={{ height: Math.round(120 * k) }} />
         </ScrollView>
 
         <View style={styles.bottomBar}>
@@ -261,45 +262,48 @@ export default function SelectPhotosScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (k, width, height) => {
+  const z = (n) => Math.round(n * k);
+  const PHOTO_SIZE = Math.floor((width - z(spacing.lg) * 2 - z(spacing.sm) * (COLS - 1)) / COLS) - 1;
+  return StyleSheet.create({
   container: { flex: 1 },
   gradient: { flex: 1 },
   sun: {
-    position: 'absolute', top: -80, right: -80,
-    width: 260, height: 260, borderRadius: 130,
+    position: 'absolute', top: z(-80), right: z(-80),
+    width: z(260), height: z(260), borderRadius: z(130),
     backgroundColor: colors.gold, opacity: 0.08,
   },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
+    paddingHorizontal: z(spacing.lg), paddingTop: z(spacing.xl), paddingBottom: z(spacing.md),
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  backText: { color: colors.accentLight, fontSize: 20, fontWeight: '600' },
-  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, justifyContent: 'center' },
-  dolphin: { fontSize: 32 },
-  title: { fontSize: 24, fontWeight: '900', color: colors.white },
-  subtitle: { fontSize: 15, color: colors.gold, fontWeight: '700', marginTop: 2 },
+  backText: { color: colors.accentLight, fontSize: z(20), fontWeight: '600' },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: z(spacing.sm), flex: 1, justifyContent: 'center' },
+  dolphin: { fontSize: z(32) },
+  title: { fontSize: z(24), fontWeight: '900', color: colors.white },
+  subtitle: { fontSize: z(15), color: colors.gold, fontWeight: '700', marginTop: z(2) },
   progressWrap: {
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.sm,
-    gap: spacing.xs, borderBottomWidth: 1,
+    paddingHorizontal: z(spacing.lg), paddingVertical: z(spacing.sm),
+    gap: z(spacing.xs), borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.08)',
     backgroundColor: 'rgba(255,214,10,0.05)',
   },
   progressBar: {
-    height: 6, backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: radius.full, overflow: 'hidden',
+    height: z(6), backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: z(radius.full), overflow: 'hidden',
   },
   progressFill: {
     height: '100%', backgroundColor: colors.gold,
-    borderRadius: radius.full,
+    borderRadius: z(radius.full),
   },
-  progressText: { fontSize: 13, color: colors.gold, textAlign: 'center', fontWeight: '700' },
+  progressText: { fontSize: z(13), color: colors.gold, textAlign: 'center', fontWeight: '700' },
   scrollView: { flex: 1 },
-  grid: { padding: spacing.lg },
-  row: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  grid: { padding: z(spacing.lg) },
+  row: { flexDirection: 'row', gap: z(spacing.sm), marginBottom: z(spacing.sm) },
   photoWrap: {
     width: PHOTO_SIZE, height: PHOTO_SIZE * 1.1,
-    borderRadius: radius.sm, overflow: 'hidden',
+    borderRadius: z(radius.sm), overflow: 'hidden',
     borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)',
   },
   photoWrapSelected: { borderColor: colors.gold, borderWidth: 3 },
@@ -309,72 +313,73 @@ const styles = StyleSheet.create({
   checkOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'flex-end', justifyContent: 'flex-start',
-    padding: spacing.xs, backgroundColor: 'rgba(255,214,10,0.25)',
+    padding: z(spacing.xs), backgroundColor: 'rgba(255,214,10,0.25)',
   },
   checkBadge: {
-    width: 32, height: 32, borderRadius: 16,
+    width: z(32), height: z(32), borderRadius: z(16),
     backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: colors.white,
   },
-  checkMark: { color: colors.primary, fontSize: 18, fontWeight: '900' },
+  checkMark: { color: colors.primary, fontSize: z(18), fontWeight: '900' },
   priceTag: {
-    position: 'absolute', bottom: 6, left: 6,
+    position: 'absolute', bottom: z(6), left: z(6),
     backgroundColor: 'rgba(0,0,0,0.65)', color: colors.gold,
-    fontSize: 12, fontWeight: '800', paddingHorizontal: 6,
-    paddingVertical: 2, borderRadius: 4,
+    fontSize: z(12), fontWeight: '800', paddingHorizontal: z(6),
+    paddingVertical: z(2), borderRadius: z(4),
   },
   zoomBtn: {
-    position: 'absolute', bottom: 6, right: 6,
-    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 12, padding: 4,
+    position: 'absolute', bottom: z(6), right: z(6),
+    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: z(12), padding: z(4),
   },
-  zoomIcon: { fontSize: 12 },
+  zoomIcon: { fontSize: z(12) },
   bottomBar: {
-    padding: spacing.lg, borderTopWidth: 1,
+    padding: z(spacing.lg), borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.08)',
     backgroundColor: '#003566',
   },
-  checkoutBtn: { borderRadius: radius.full, overflow: 'hidden' },
-  checkoutGrad: { paddingVertical: spacing.lg, alignItems: 'center' },
-  checkoutText: { fontSize: 18, fontWeight: '900', letterSpacing: 1, color: colors.primary },
-  hintBar: { paddingVertical: spacing.md, alignItems: 'center' },
-  hintText: { fontSize: 14, color: colors.accentLight, textAlign: 'center' },
+  checkoutBtn: { borderRadius: z(radius.full), overflow: 'hidden' },
+  checkoutGrad: { paddingVertical: z(spacing.lg), alignItems: 'center' },
+  checkoutText: { fontSize: z(18), fontWeight: '900', letterSpacing: z(1), color: colors.primary },
+  hintBar: { paddingVertical: z(spacing.md), alignItems: 'center' },
+  hintText: { fontSize: z(14), color: colors.accentLight, textAlign: 'center' },
   modalOverlay: {
     flex: 1, backgroundColor: 'rgba(0,20,50,0.97)',
-    alignItems: 'center', justifyContent: 'center', padding: spacing.lg,
+    alignItems: 'center', justifyContent: 'center', padding: z(spacing.lg),
   },
   closeBtn: {
-    position: 'absolute', top: spacing.xl, right: spacing.xl,
-    width: 44, height: 44, borderRadius: 22,
+    position: 'absolute', top: z(spacing.xl), right: z(spacing.xl),
+    width: z(44), height: z(44), borderRadius: z(22),
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center', justifyContent: 'center', zIndex: 10,
   },
-  closeBtnText: { color: colors.white, fontSize: 20, fontWeight: '700' },
+  closeBtnText: { color: colors.white, fontSize: z(20), fontWeight: '700' },
   photoCounter: {
-    position: 'absolute', top: spacing.xl + 8,
+    position: 'absolute', top: z(spacing.xl + 8),
     left: 0, right: 0, textAlign: 'center',
-    color: colors.gold, fontSize: 15, fontWeight: '700',
+    color: colors.gold, fontSize: z(15), fontWeight: '700',
   },
   navRow: {
     flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: spacing.md, width: '100%',
+    justifyContent: 'center', gap: z(spacing.md), width: '100%',
   },
   navBtn: {
-    width: 52, height: 52, borderRadius: 26,
+    width: z(52), height: z(52), borderRadius: z(26),
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
   navBtnDisabled: { opacity: 0.2 },
-  navBtnText: { color: colors.white, fontSize: 32, fontWeight: '300' },
-  previewImage: { width: width * 0.82, height: height * 0.75, borderRadius: radius.lg },
-  modalActions: { marginTop: spacing.lg, width: '100%', maxWidth: 400 },
-  addBtn: { borderRadius: radius.full, overflow: 'hidden' },
+  navBtnText: { color: colors.white, fontSize: z(32), fontWeight: '300' },
+  previewImage: { width: width * 0.82, height: height * 0.75, borderRadius: z(radius.lg) },
+  modalActions: { marginTop: z(spacing.lg), width: '100%', maxWidth: z(400) },
+  addBtn: { borderRadius: z(radius.full), overflow: 'hidden' },
   addBtnDisabled: { opacity: 0.6 },
-  addBtnGrad: { paddingVertical: spacing.md, alignItems: 'center' },
-  addBtnText: { fontSize: 18, fontWeight: '900' },
+  addBtnGrad: { paddingVertical: z(spacing.md), alignItems: 'center' },
+  addBtnText: { fontSize: z(18), fontWeight: '900' },
   removeBtn: {
-    paddingVertical: spacing.md, alignItems: 'center',
-    borderRadius: radius.full, borderWidth: 2, borderColor: colors.error,
+    paddingVertical: z(spacing.md), alignItems: 'center',
+    borderRadius: z(radius.full), borderWidth: 2, borderColor: colors.error,
   },
-  removeBtnText: { fontSize: 18, fontWeight: '800', color: colors.error },
+  removeBtnText: { fontSize: z(18), fontWeight: '800', color: colors.error },
 });
+};

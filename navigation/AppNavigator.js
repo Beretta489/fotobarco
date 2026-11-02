@@ -11,9 +11,6 @@ import ExtrasScreen from '../screens/ExtrasScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
 import PaymentScreen from '../screens/PaymentScreen';
 import ConfirmationScreen from '../screens/ConfirmationScreen';
-import AdminLoginScreen from '../screens/AdminLoginScreen';
-import AdminDashboardScreen from '../screens/AdminDashboardScreen';
-import PendingOrdersScreen from '../screens/PendingOrdersScreen';
 import PhoneScreen from '../screens/PhoneScreen';
 import CallAttendantScreen from '../screens/CallAttendantScreen';
 import AttendantConfirmScreen from '../screens/AttendantConfirmScreen';
@@ -37,9 +34,6 @@ export default function AppNavigator() {
         <Stack.Screen name="CallAttendant" component={CallAttendantScreen} />
         <Stack.Screen name="AttendantConfirm" component={AttendantConfirmScreen} />
         <Stack.Screen name="Confirmation" component={ConfirmationScreen} />
-        <Stack.Screen name="AdminLogin" component={AdminLoginScreen} />
-        <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
-        <Stack.Screen name="PendingOrders" component={PendingOrdersScreen} />
         <Stack.Screen name="Phone" component={PhoneScreen} />
       </Stack.Navigator>
     </NavigationContainer>

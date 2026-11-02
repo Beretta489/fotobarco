@@ -15,11 +15,11 @@ import {
   View, Text, StyleSheet, TouchableOpacity,
   ActivityIndicator, StatusBar, Animated, ScrollView,
 } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import QRCode from 'react-native-qrcode-svg';
-import { infinitePayService, mensagemDeErro } from '../services/infinitepay';
+import { paymentService, mensagemDeErro } from '../services/payments';
 import { colors, spacing, radius } from '../utils/theme';
+import { useScale, useScaledStyles } from '../utils/responsive';
 
 const PIX_POLL_MS = 3000;
 
@@ -33,6 +33,8 @@ const FASE = {
 };
 
 export default function PaymentScreen({ route, navigation }) {
+  const k = useScale();
+  const styles = useScaledStyles(createStyles);
   const {
     session, group, photoIds, photos, packageType,
     extras = [], clientPhone, totalEstimado = 0,
@@ -42,7 +44,6 @@ export default function PaymentScreen({ route, navigation }) {
   const [erro, setErro] = useState('');
   const [podeRepetir, setPodeRepetir] = useState(true);
   const [intent, setIntent] = useState(null);
-  const [copiado, setCopiado] = useState(false);
   const [tempoRestante, setTempoRestante] = useState(0);
 
   const pulse = useRef(new Animated.Value(1)).current;
@@ -114,7 +115,7 @@ export default function PaymentScreen({ route, navigation }) {
     setFase(FASE.CRIANDO);
 
     try {
-      const resposta = await infinitePayService.createIntent({
+      const resposta = await paymentService.createIntent({
         sessionId: session.id,
         groupId: group?.id,
         packageType,
@@ -161,7 +162,7 @@ export default function PaymentScreen({ route, navigation }) {
 
     pollRef.current = setInterval(async () => {
       try {
-        const r = await infinitePayService.checkPixStatus(orderNsu);
+        const r = await paymentService.checkPixStatus(orderNsu);
         if (!montadoRef.current) return;
 
         if (r.status === 'paid') {
@@ -184,7 +185,7 @@ export default function PaymentScreen({ route, navigation }) {
     setErro('');
     setFase(FASE.CONFIRMANDO);
     try {
-      const r = await infinitePayService.checkPixStatus(intent.orderNsu);
+      const r = await paymentService.checkPixStatus(intent.orderNsu);
       if (r.status === 'paid') concluir(r);
       else falhar(r.error || 'PAGAMENTO_NAO_CONFIRMADO', true);
     } catch (e) {
@@ -192,21 +193,9 @@ export default function PaymentScreen({ route, navigation }) {
     }
   }, [intent, concluir, falhar]);
 
-  // Efi devolve o BR Code (Pix copia e cola); a InfinitePay, um link. O QR
-  // Code e o botao de copiar usam o que vier.
+  // BR Code do Efi (Pix copia e cola). checkoutUrl e o mesmo valor, mantido
+  // pelo servidor para o APK antigo.
   const pixCodigo = intent?.pixCopiaECola || intent?.checkoutUrl || null;
-  const ehCopiaECola = Boolean(intent?.pixCopiaECola);
-
-  const copiarCodigo = async () => {
-    if (!pixCodigo) return;
-    try {
-      await Clipboard.setStringAsync(pixCodigo);
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2500);
-    } catch (_) {
-      // Sem permissao de area de transferencia (web): o QR continua valendo.
-    }
-  };
 
   // ------------------------------------------------------------------ render --
   const minutos = Math.floor(tempoRestante / 60);
@@ -231,7 +220,7 @@ export default function PaymentScreen({ route, navigation }) {
           <Text style={styles.dolphin}>🐬</Text>
           <Text style={styles.title}>Pagamento via Pix</Text>
         </View>
-        <View style={{ width: 90 }} />
+        <View style={{ width: Math.round(90 * k) }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -273,16 +262,14 @@ export default function PaymentScreen({ route, navigation }) {
         {fase === FASE.PIX_AGUARDANDO && pixCodigo && (
           <>
             <Text style={styles.instruction}>
-              {ehCopiaECola
-                ? 'Peça para o cliente escanear com o app do banco (Pix > Ler QR Code):'
-                : 'Peça para o cliente escanear com a câmera do celular:'}
+              {'Peça para o cliente escanear com o app do banco (Pix > Ler QR Code):'}
             </Text>
 
             <Animated.View style={[styles.qrWrapper, { transform: [{ scale: pulse }] }]}>
               <View style={styles.qrInner}>
                 <QRCode
                   value={pixCodigo}
-                  size={200}
+                  size={Math.round(260 * k)}
                   color="#003566"
                   backgroundColor="#FFFFFF"
                 />
@@ -296,14 +283,6 @@ export default function PaymentScreen({ route, navigation }) {
               </Text>
             </View>
 
-            <TouchableOpacity style={styles.copyBtn} onPress={copiarCodigo}>
-              <Text style={styles.copyText}>
-                {ehCopiaECola
-                  ? (copiado ? '✓ Pix copiado!' : '📋 Copiar Pix copia e cola')
-                  : (copiado ? '✓ Link copiado!' : '📋 Copiar link de pagamento')}
-              </Text>
-            </TouchableOpacity>
-
             <View style={styles.box}>
               <ActivityIndicator color={colors.gold} />
               <Text style={styles.boxText}>Aguardando confirmação do pagamento...</Text>
@@ -316,7 +295,7 @@ export default function PaymentScreen({ route, navigation }) {
           <View style={styles.box}>
             <ActivityIndicator color={colors.success} size="large" />
             <Text style={styles.boxTitle}>Confirmando pagamento...</Text>
-            <Text style={styles.boxText}>{intent?.provider === 'efi' ? 'Conferindo com o banco.' : 'Conferindo com a InfinitePay.'} Não feche o app.</Text>
+            <Text style={styles.boxText}>Conferindo com o banco. Não feche o app.</Text>
           </View>
         )}
 
@@ -325,85 +304,82 @@ export default function PaymentScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (k) => {
+  const z = (n) => Math.round(n * k);
+  return StyleSheet.create({
   container: { flex: 1 },
   sun: {
-    position: 'absolute', top: -80, right: -80,
-    width: 260, height: 260, borderRadius: 130,
+    position: 'absolute', top: z(-80), right: z(-80),
+    width: z(260), height: z(260), borderRadius: z(130),
     backgroundColor: colors.gold, opacity: 0.08,
   },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
+    paddingHorizontal: z(spacing.lg), paddingTop: z(spacing.xl), paddingBottom: z(spacing.md),
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  backText: { color: colors.accentLight, fontSize: 20, fontWeight: '600' },
-  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'center' },
-  dolphin: { fontSize: 32 },
-  title: { fontSize: 24, fontWeight: '900', color: colors.white },
+  backText: { color: colors.accentLight, fontSize: z(20), fontWeight: '600' },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: z(8), flex: 1, justifyContent: 'center' },
+  dolphin: { fontSize: z(32) },
+  title: { fontSize: z(24), fontWeight: '900', color: colors.white },
   content: {
-    alignItems: 'center', paddingHorizontal: spacing.xl, gap: spacing.lg,
-    paddingTop: spacing.md, paddingBottom: spacing.xl,
+    alignItems: 'center', paddingHorizontal: z(spacing.xl), gap: z(spacing.lg),
+    paddingTop: z(spacing.md), paddingBottom: z(spacing.xl),
   },
   amountCard: {
     backgroundColor: 'rgba(255,214,10,0.12)',
-    borderRadius: radius.lg, borderWidth: 1, borderColor: 'rgba(255,214,10,0.3)',
-    paddingVertical: spacing.md, paddingHorizontal: spacing.xl,
+    borderRadius: z(radius.lg), borderWidth: 1, borderColor: 'rgba(255,214,10,0.3)',
+    paddingVertical: z(spacing.md), paddingHorizontal: z(spacing.xl),
     alignItems: 'center', width: '100%',
   },
-  amountLabel: { fontSize: 11, letterSpacing: 2, color: colors.gray400, fontWeight: '700' },
-  amount: { fontSize: 42, fontWeight: '900', color: colors.gold },
-  amountSub: { fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
-  instruction: { fontSize: 15, color: colors.accentLight, textAlign: 'center' },
+  amountLabel: { fontSize: z(11), letterSpacing: z(2), color: colors.gray400, fontWeight: '700' },
+  amount: { fontSize: z(42), fontWeight: '900', color: colors.gold },
+  amountSub: { fontSize: z(13), color: 'rgba(255,255,255,0.4)', marginTop: z(2) },
+  instruction: { fontSize: z(15), color: colors.accentLight, textAlign: 'center' },
   qrWrapper: {
-    padding: 6, borderRadius: radius.lg,
+    padding: z(6), borderRadius: z(radius.lg),
     borderWidth: 3, borderColor: colors.gold, backgroundColor: colors.white,
     shadowColor: colors.gold, shadowOpacity: 0.4,
-    shadowOffset: { width: 0, height: 4 }, shadowRadius: 12, elevation: 8,
+    shadowOffset: { width: 0, height: z(4) }, shadowRadius: z(12), elevation: 8,
   },
   qrInner: {
-    padding: 12, borderRadius: radius.md, backgroundColor: colors.white,
-    alignItems: 'center', justifyContent: 'center', minWidth: 224, minHeight: 224,
+    padding: z(12), borderRadius: z(radius.md), backgroundColor: colors.white,
+    alignItems: 'center', justifyContent: 'center', minWidth: z(224), minHeight: z(224),
   },
   timerBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: radius.full,
-    paddingVertical: spacing.sm, paddingHorizontal: spacing.lg,
+    flexDirection: 'row', alignItems: 'center', gap: z(spacing.sm),
+    backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: z(radius.full),
+    paddingVertical: z(spacing.sm), paddingHorizontal: z(spacing.lg),
   },
   timerExpired: { backgroundColor: 'rgba(255,71,87,0.15)' },
-  timerIcon: { fontSize: 18 },
-  timerText: { fontSize: 18, fontWeight: '700', color: colors.accentLight },
-  copyBtn: {
-    backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: radius.full,
-    paddingVertical: spacing.sm, paddingHorizontal: spacing.xl,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
-  },
-  copyText: { fontSize: 16, color: colors.white, fontWeight: '600' },
+  timerIcon: { fontSize: z(18) },
+  timerText: { fontSize: z(18), fontWeight: '700', color: colors.accentLight },
   box: {
-    alignItems: 'center', gap: spacing.sm,
+    alignItems: 'center', gap: z(spacing.sm),
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: radius.lg, padding: spacing.lg,
+    borderRadius: z(radius.lg), padding: z(spacing.lg),
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', width: '100%',
   },
-  bigEmoji: { fontSize: 44 },
-  boxTitle: { fontSize: 17, fontWeight: '800', color: colors.white, textAlign: 'center' },
-  boxText: { fontSize: 14, color: colors.accentLight, textAlign: 'center', lineHeight: 20 },
+  bigEmoji: { fontSize: z(44) },
+  boxTitle: { fontSize: z(17), fontWeight: '800', color: colors.white, textAlign: 'center' },
+  boxText: { fontSize: z(14), color: colors.accentLight, textAlign: 'center', lineHeight: z(20) },
   errorBox: {
     width: '100%', backgroundColor: 'rgba(255,71,87,0.1)',
     borderColor: 'rgba(255,71,87,0.3)', borderWidth: 1,
-    borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md, alignItems: 'center',
+    borderRadius: z(radius.lg), padding: z(spacing.lg), gap: z(spacing.md), alignItems: 'center',
   },
-  errorText: { color: colors.error, fontSize: 15, textAlign: 'center' },
-  errorActions: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap', justifyContent: 'center' },
+  errorText: { color: colors.error, fontSize: z(15), textAlign: 'center' },
+  errorActions: { flexDirection: 'row', gap: z(spacing.sm), flexWrap: 'wrap', justifyContent: 'center' },
   retryBtn: {
-    backgroundColor: colors.gold, borderRadius: radius.full,
-    paddingVertical: spacing.sm, paddingHorizontal: spacing.lg,
+    backgroundColor: colors.gold, borderRadius: z(radius.full),
+    paddingVertical: z(spacing.sm), paddingHorizontal: z(spacing.lg),
   },
   retryText: { color: colors.primary, fontWeight: '800' },
   secondaryBtn: {
-    backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: radius.full,
-    paddingVertical: spacing.sm, paddingHorizontal: spacing.lg,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', marginTop: spacing.sm,
+    backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: z(radius.full),
+    paddingVertical: z(spacing.sm), paddingHorizontal: z(spacing.lg),
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', marginTop: z(spacing.sm),
   },
   secondaryText: { color: colors.white, fontWeight: '700' },
 });
+};

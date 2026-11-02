@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, radius } from '../utils/theme';
+import { useScale, useScaledStyles } from '../utils/responsive';
 import { EXTRAS_CATALOG, buildExtras } from '../utils/extras';
 
 const H_PADDING = spacing.lg;
@@ -28,19 +29,24 @@ function Sinal({ mais, tamanho, cor }) {
 }
 
 export default function ExtrasScreen({ route, navigation }) {
+  const k = useScale();
+  const styles = useScaledStyles(createStyles);
   const { session, group, photoIds, photos, total, packageType } = route.params;
   const { width } = useWindowDimensions();
 
-  // 4 cards por fileira em telas largas (tablet deitado), 3 nas mais estreitas.
-  const numColumns = width >= 820 ? 4 : 3;
+  // 4 cards por fileira em telas largas (tablet deitado), 3 nas mais estreitas
+  // e 2 no celular (com 3 colunas os cards ficariam minusculos).
+  const numColumns = width >= 820 ? 4 : width >= 600 ? 3 : 2;
+  const pad = Math.round(H_PADDING * k);
+  const gap = Math.round(GAP * k);
   const cardWidth = Math.floor(
-    (width - H_PADDING * 2 - GAP * (numColumns - 1)) / numColumns
-  );
+    (width - pad * 2 - gap * (numColumns - 1)) / numColumns
+  ) - 1;
 
-  // O conteudo do card e dimensionado para CONTENT_BASE px de largura util
-  // (tablet deitado, 4 colunas). Em telas mais estreitas tudo encolhe na mesma
-  // proporcao -- senao o seletor "- 2 +" vazaria para fora do card.
-  const s = Math.min(1, (cardWidth - spacing.md * 2) / CONTENT_BASE);
+  // O conteudo do card e dimensionado para CONTENT_BASE px de largura util e
+  // cresce com a escala da tela (k), sem passar da largura do card -- senao o
+  // seletor "- 2 +" vazaria para fora.
+  const s = Math.min(k, (cardWidth - Math.round(spacing.md * k) * 2) / CONTENT_BASE);
   const dyn = useMemo(() => {
     const px = (n) => Math.round(n * s);
     const circle = (d) => ({ width: px(d), height: px(d), borderRadius: px(d) / 2 });
@@ -110,7 +116,7 @@ export default function ExtrasScreen({ route, navigation }) {
             <Text style={styles.subtitle}>Toque no + para adicionar (opcional)</Text>
           </View>
         </View>
-        <View style={{ width: 90 }} />
+        <View style={{ width: Math.round(90 * k) }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -174,7 +180,7 @@ export default function ExtrasScreen({ route, navigation }) {
             </View>
           </View>
         ))}
-        <View style={{ height: 120 }} />
+        <View style={{ height: Math.round(120 * k) }} />
       </ScrollView>
 
       <View style={styles.footer}>
@@ -206,45 +212,47 @@ export default function ExtrasScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (k) => {
+  const z = (n) => Math.round(n * k);
+  return StyleSheet.create({
   container: { flex: 1 },
   sun: {
-    position: 'absolute', top: -80, right: -80,
-    width: 260, height: 260, borderRadius: 130,
+    position: 'absolute', top: z(-80), right: z(-80),
+    width: z(260), height: z(260), borderRadius: z(130),
     backgroundColor: colors.gold, opacity: 0.08,
   },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md,
+    paddingHorizontal: z(spacing.lg), paddingTop: z(spacing.xl), paddingBottom: z(spacing.md),
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  backText: { color: colors.accentLight, fontSize: 20, fontWeight: '600' },
-  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, justifyContent: 'center' },
-  dolphin: { fontSize: 32 },
-  title: { fontSize: 24, fontWeight: '900', color: colors.white },
-  subtitle: { fontSize: 15, color: colors.gold, fontWeight: '700', marginTop: 2 },
-  content: { padding: spacing.lg, gap: spacing.xl },
-  section: { gap: spacing.md },
-  sectionLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 2, color: colors.gray400 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
+  backText: { color: colors.accentLight, fontSize: z(20), fontWeight: '600' },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: z(spacing.sm), flex: 1, justifyContent: 'center' },
+  dolphin: { fontSize: z(32) },
+  title: { fontSize: z(24), fontWeight: '900', color: colors.white },
+  subtitle: { fontSize: z(15), color: colors.gold, fontWeight: '700', marginTop: z(2) },
+  content: { padding: z(spacing.lg), gap: z(spacing.xl) },
+  section: { gap: z(spacing.md) },
+  sectionLabel: { fontSize: z(12), fontWeight: '700', letterSpacing: z(2), color: colors.gray400 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: z(GAP) },
   // A largura do card e a da grade; so o CONTEUDO foi ampliado (~1,5x) e
   // centralizado. Os tamanhos ficam em `dyn` (ExtrasScreen), que escala com a
   // largura do card. A altura do card acompanha o conteudo.
   card: {
-    minHeight: 190,
+    minHeight: z(190),
     backgroundColor: colors.cardBg,
     borderWidth: 1, borderColor: colors.cardBorder,
-    borderRadius: radius.lg,
-    padding: spacing.md,
+    borderRadius: z(radius.lg),
+    padding: z(spacing.md),
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   cardActive: { borderColor: colors.gold, borderWidth: 2, backgroundColor: 'rgba(255,214,10,0.10)' },
-  cardBody: { gap: spacing.sm, alignItems: 'center', width: '100%' },
+  cardBody: { gap: z(spacing.sm), alignItems: 'center', width: '100%' },
   cardEmoji: { textAlign: 'center' },
   cardName: { fontWeight: '800', color: colors.white, textAlign: 'center' },
   cardPrice: { fontWeight: '900', color: colors.gold, textAlign: 'center' },
-  actionRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: spacing.md },
+  actionRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: z(spacing.md) },
   addBtn: {
     backgroundColor: colors.gold,
     alignItems: 'center', justifyContent: 'center',
@@ -252,7 +260,7 @@ const styles = StyleSheet.create({
   stepper: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.25)',
-    borderRadius: radius.full,
+    borderRadius: z(radius.full),
   },
   stepBtn: {
     backgroundColor: 'rgba(255,255,255,0.12)',
@@ -265,14 +273,15 @@ const styles = StyleSheet.create({
   },
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    padding: spacing.lg, backgroundColor: '#003566',
+    padding: z(spacing.lg), backgroundColor: '#003566',
     borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)',
-    gap: spacing.sm,
+    gap: z(spacing.sm),
   },
-  footerSummary: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xs },
-  footerCount: { fontSize: 15, color: colors.accentLight, fontWeight: '700' },
-  footerTotal: { fontSize: 20, fontWeight: '900', color: colors.gold },
-  continueBtn: { borderRadius: radius.full, overflow: 'hidden' },
-  continueGrad: { paddingVertical: spacing.lg, alignItems: 'center' },
-  continueText: { fontSize: 18, fontWeight: '900', letterSpacing: 1, color: colors.primary },
+  footerSummary: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: z(spacing.xs) },
+  footerCount: { fontSize: z(15), color: colors.accentLight, fontWeight: '700' },
+  footerTotal: { fontSize: z(20), fontWeight: '900', color: colors.gold },
+  continueBtn: { borderRadius: z(radius.full), overflow: 'hidden' },
+  continueGrad: { paddingVertical: z(spacing.lg), alignItems: 'center' },
+  continueText: { fontSize: z(18), fontWeight: '900', letterSpacing: z(1), color: colors.primary },
 });
+};
